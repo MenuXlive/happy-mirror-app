@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FoodMenuManager } from "@/components/admin/FoodMenuManager";
 import { AlcoholMenuManager } from "@/components/admin/AlcoholMenuManager";
 import { PromotionsManager } from "@/components/admin/PromotionsManager";
+import AdminSettings from "@/components/admin/AdminSettings";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -94,10 +95,11 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="food" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="food">Food Menu</TabsTrigger>
             <TabsTrigger value="alcohol">Alcohol Menu</TabsTrigger>
             <TabsTrigger value="promotions">Promotions</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
           
           <TabsContent value="food" className="mt-6">
@@ -110,6 +112,10 @@ const Admin = () => {
           
           <TabsContent value="promotions" className="mt-6">
             <PromotionsManager />
+          </TabsContent>
+
+          <TabsContent value="settings" className="mt-6">
+            <AdminSettings />
           </TabsContent>
         </Tabs>
       </div>

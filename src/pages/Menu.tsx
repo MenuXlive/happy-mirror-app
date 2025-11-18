@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 import { PRESET_PROMOTIONS, getPresetByKey } from "@/lib/promotions";
+import { Instagram, Facebook, MapPin, Globe } from "lucide-react";
 
 type AlcoholItem = Tables<"alcohol">;
 type FoodItem = Tables<"food_menu">;
@@ -69,6 +70,7 @@ const Menu = () => {
   const [foodTypeFilter, setFoodTypeFilter] = useState<"all" | "veg" | "nonveg">("all");
   const [activePromotionKeys, setActivePromotionKeys] = useState<string[]>([]);
   const [loadingPromotions, setLoadingPromotions] = useState(false);
+  const [venueSettings, setVenueSettings] = useState<{ instagram_url?: string | null; facebook_url?: string | null; website_url?: string | null; address?: string | null }>({});
 
   useEffect(() => {
     async function fetchMenu() {
@@ -113,6 +115,40 @@ const Menu = () => {
       }
     }
     fetchPromotions();
+  }, []);
+
+  // Fetch venue settings (Supabase with localStorage fallback)
+  useEffect(() => {
+    async function fetchSettings() {
+      try {
+        const { data, error } = await supabase
+          .from("venue_settings")
+          .select("id, instagram_url, facebook_url, website_url, address")
+          .eq("id", "default")
+          .maybeSingle();
+        if (error) throw error;
+        if (data) {
+          setVenueSettings({
+            instagram_url: data.instagram_url ?? null,
+            facebook_url: data.facebook_url ?? null,
+            website_url: data.website_url ?? null,
+            address: data.address ?? null,
+          });
+          try { localStorage.setItem("venue_settings", JSON.stringify(data)); } catch {}
+        } else {
+          const raw = localStorage.getItem("venue_settings");
+          if (raw) {
+            setVenueSettings(JSON.parse(raw));
+          }
+        }
+      } catch (err) {
+        const raw = localStorage.getItem("venue_settings");
+        if (raw) {
+          try { setVenueSettings(JSON.parse(raw)); } catch {}
+        }
+      }
+    }
+    fetchSettings();
   }, []);
 
   const categoriesBuckets: CategoryBucket<AlcoholItem | FoodItem>[] = useMemo(() => {
@@ -210,6 +246,59 @@ const Menu = () => {
           <h1 className="text-3xl md:text-4xl font-bold text-primary">Our Menu</h1>
           <p className="text-muted-foreground">Premium beverages and delicious cuisine</p>
         </div>
+
+        {(venueSettings.instagram_url || venueSettings.facebook_url || venueSettings.website_url || venueSettings.address) && (
+          <div className="mb-4">
+            <Card className="rounded-xl border bg-card/70 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-primary">Connect with us</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-center gap-3">
+                  {venueSettings.instagram_url && (
+                    <a
+                      href={venueSettings.instagram_url!}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-md border hover:bg-background"
+                    >
+                      <Instagram className="h-4 w-4" />
+                      <span className="text-sm">Instagram</span>
+                    </a>
+                  )}
+                  {venueSettings.facebook_url && (
+                    <a
+                      href={venueSettings.facebook_url!}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-md border hover:bg-background"
+                    >
+                      <Facebook className="h-4 w-4" />
+                      <span className="text-sm">Facebook</span>
+                    </a>
+                  )}
+                  {venueSettings.website_url && (
+                    <a
+                      href={venueSettings.website_url!}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-md border hover:bg-background"
+                    >
+                      <Globe className="h-4 w-4" />
+                      <span className="text-sm">Website</span>
+                    </a>
+                  )}
+                  {venueSettings.address && (
+                    <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md border">
+                      <MapPin className="h-4 w-4" />
+                      <span className="text-sm truncate max-w-[280px]">{venueSettings.address}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {activePromotions.length > 0 && (
           <div className="mb-4">

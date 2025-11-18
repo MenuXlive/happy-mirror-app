@@ -212,6 +212,23 @@ export const AlcoholMenuManager = () => {
 
   // Derived categories from existing items
   const categories = Array.from(new Set(items.map((i) => i.category).filter(Boolean)));
+  // Add preset alcohol categories and merge with existing categories
+  const presetAlcoholCategories = [
+    "Cocktails",
+    "Mocktails",
+    "Beer",
+    "Wine",
+    "Whiskey",
+    "Vodka",
+    "Rum",
+    "Gin",
+    "Shots",
+    "Non-Alcoholic",
+    "Cider",
+    "Liqueur",
+    "Tequila",
+  ];
+  const categoriesToShow = Array.from(new Set([...presetAlcoholCategories, ...categories]));
   // Availability counts per category
   const categoryCounts = useMemo(() => {
     const map = new Map<string, { availableCount: number; unavailableCount: number }>();
@@ -402,7 +419,7 @@ export const AlcoholMenuManager = () => {
       <Card className="bg-card border-border">
         <CardContent className="pt-6 space-y-3">
           <div className="flex flex-wrap gap-2">
-            {categories.map((c) => (
+            {categoriesToShow.map((c) => (
               <Button
                 key={c}
                 variant={selectedCategory === c ? "secondary" : "outline"}

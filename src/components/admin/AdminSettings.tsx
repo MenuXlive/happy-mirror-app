@@ -1,0 +1,159 @@
+import React, { useEffect, useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import { createClient } from "@supabase/supabase-js";
+
+// Simple Supabase helper that respects existing env vars
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+
+export type VenueSettings = {
+  id: string; // fixed to 'default'
+  instagram_url?: string | null;
+  facebook_url?: string | null;
+  website_url?: string | null;
+  address?: string | null;
+  updated_at?: string | null;
+};
+
+const DEFAULT_ID = "default";
+const LS_KEY = "venue_settings";
+
+export default function AdminSettings() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState<VenueSettings>({ id: DEFAULT_ID, instagram_url: "", facebook_url: "", website_url: "", address: "" });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      setLoading(true);
+      try {
+        if (supabase) {
+          const { data, error } = await supabase
+            .from("venue_settings")
+            .select("id, instagram_url, facebook_url, website_url, address, updated_at")
+            .eq("id", DEFAULT_ID)
+            .maybeSingle();
+          if (error) throw error;
+          if (data) {
+            setForm({
+              id: DEFAULT_ID,
+              instagram_url: data.instagram_url ?? "",
+              facebook_url: data.facebook_url ?? "",
+              website_url: data.website_url ?? "",
+              address: data.address ?? "",
+              updated_at: data.updated_at ?? null,
+            });
+          } else {
+            // Fallback to localStorage when no data
+            const raw = localStorage.getItem(LS_KEY);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              setForm({ ...form, ...parsed });
+            }
+          }
+        } else {
+          const raw = localStorage.getItem(LS_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            setForm({ ...form, ...parsed });
+          }
+        }
+      } catch (e: any) {
+        console.warn("Settings fetch error, using localStorage fallback:", e?.message || e);
+        const raw = localStorage.getItem(LS_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setForm({ ...form, ...parsed });
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const save = async () => {
+    setLoading(true);
+    try {
+      const payload = {
+        id: DEFAULT_ID,
+        instagram_url: form.instagram_url || null,
+        facebook_url: form.facebook_url || null,
+        website_url: form.website_url || null,
+        address: form.address || null,
+        updated_at: new Date().toISOString(),
+      };
+      if (supabase) {
+        const { error } = await supabase.from("venue_settings").upsert(payload, { onConflict: "id" });
+        if (error) throw error;
+      }
+      localStorage.setItem(LS_KEY, JSON.stringify(payload));
+      toast({ title: "Saved", description: "Settings updated successfully." });
+    } catch (e: any) {
+      toast({ title: "Error saving", description: e?.message || String(e), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-primary">Venue Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="instagram_url">Instagram URL</Label>
+              <Input
+                id="instagram_url"
+                placeholder="https://instagram.com/yourhandle"
+                value={form.instagram_url || ""}
+                onChange={(e) => setForm((f) => ({ ...f, instagram_url: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="facebook_url">Facebook URL</Label>
+              <Input
+                id="facebook_url"
+                placeholder="https://facebook.com/yourpage"
+                value={form.facebook_url || ""}
+                onChange={(e) => setForm((f) => ({ ...f, facebook_url: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="website_url">Website URL</Label>
+              <Input
+                id="website_url"
+                placeholder="https://yourwebsite.com"
+                value={form.website_url || ""}
+                onChange={(e) => setForm((f) => ({ ...f, website_url: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                placeholder="123 Main Street, City"
+                value={form.address || ""}
+                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={save} disabled={loading} className="bg-primary">
+              {loading ? "Saving..." : "Save Settings"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
