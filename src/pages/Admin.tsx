@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogOut } from "lucide-react";
+import { LogOut, QrCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { FoodMenuManager } from "@/components/admin/FoodMenuManager";
 import { AlcoholMenuManager } from "@/components/admin/AlcoholMenuManager";
+import { PromotionsManager } from "@/components/admin/PromotionsManager";
+import AdminSettings from "@/components/admin/AdminSettings";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -81,16 +83,23 @@ const Admin = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold text-primary">Admin Panel</h1>
-          <Button onClick={handleLogout} variant="outline">
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => navigate('/admin/qr')} className="gap-2">
+              <QrCode className="h-4 w-4" /> Generate QR
+            </Button>
+            <Button onClick={handleLogout} variant="outline">
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="food" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="food">Food Menu</TabsTrigger>
             <TabsTrigger value="alcohol">Alcohol Menu</TabsTrigger>
+            <TabsTrigger value="promotions">Promotions</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
           
           <TabsContent value="food" className="mt-6">
@@ -99,6 +108,14 @@ const Admin = () => {
           
           <TabsContent value="alcohol" className="mt-6">
             <AlcoholMenuManager />
+          </TabsContent>
+          
+          <TabsContent value="promotions" className="mt-6">
+            <PromotionsManager />
+          </TabsContent>
+
+          <TabsContent value="settings" className="mt-6">
+            <AdminSettings />
           </TabsContent>
         </Tabs>
       </div>
