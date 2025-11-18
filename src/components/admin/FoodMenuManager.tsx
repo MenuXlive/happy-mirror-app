@@ -60,6 +60,8 @@ export const FoodMenuManager = () => {
   const [vegFilter, setVegFilter] = useState<"all" | "veg" | "nonveg">("all");
   // Controls whether we use a custom category text input
   const [useCustomCategory, setUseCustomCategory] = useState(false);
+  // Filter by availability (all, available, unavailable)
+  const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "available" | "unavailable">("all");
 
   useEffect(() => {
     fetchItems();
@@ -140,6 +142,20 @@ export const FoodMenuManager = () => {
     }
   };
 
+  // Quick toggle availability without editing form
+  const handleToggleAvailability = async (item: FoodItem) => {
+    const { error } = await supabase
+      .from('food_menu')
+      .update({ available: !item.available })
+      .eq('id', item.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: `Marked as ${!item.available ? 'Available' : 'Unavailable'}` });
+      fetchItems();
+    }
+  };
+
   const resetForm = () => {
     setEditingId(null);
     setFormData({
@@ -161,6 +177,11 @@ export const FoodMenuManager = () => {
     .filter((i) => {
       if (vegFilter === "veg") return i.vegetarian === true;
       if (vegFilter === "nonveg") return i.vegetarian === false;
+      return true;
+    })
+    .filter((i) => {
+      if (availabilityFilter === "available") return i.available === true;
+      if (availabilityFilter === "unavailable") return i.available === false;
       return true;
     })
     .filter((i) => (searchQuery ? i.name.toLowerCase().includes(searchQuery.toLowerCase()) : true));
@@ -308,6 +329,11 @@ export const FoodMenuManager = () => {
             <Button variant={vegFilter === "veg" ? "secondary" : "outline"} size="sm" onClick={() => setVegFilter("veg")}>Veg</Button>
             <Button variant={vegFilter === "nonveg" ? "secondary" : "outline"} size="sm" onClick={() => setVegFilter("nonveg")}>Non-Veg</Button>
           </div>
+          <div className="flex gap-2">
+            <Button variant={availabilityFilter === "all" ? "secondary" : "outline"} size="sm" onClick={() => setAvailabilityFilter("all")}>All</Button>
+            <Button variant={availabilityFilter === "available" ? "secondary" : "outline"} size="sm" onClick={() => setAvailabilityFilter("available")}>Available</Button>
+            <Button variant={availabilityFilter === "unavailable" ? "secondary" : "outline"} size="sm" onClick={() => setAvailabilityFilter("unavailable")}>Unavailable</Button>
+          </div>
           <div>
             <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search food items" />
           </div>
@@ -337,6 +363,9 @@ export const FoodMenuManager = () => {
                   </Button>
                   <Button size="icon" variant="destructive" onClick={() => handleDelete(item.id)}>
                     <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant={item.available ? "outline" : "secondary"} onClick={() => handleToggleAvailability(item)}>
+                    {item.available ? "Mark Unavailable" : "Mark Available"}
                   </Button>
                 </div>
               </div>

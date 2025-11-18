@@ -65,6 +65,8 @@ export const AlcoholMenuManager = () => {
   const [searchQuery, setSearchQuery] = useState("");
   // Controls whether we use a custom category text input
   const [useCustomCategory, setUseCustomCategory] = useState(false);
+  // Filter by availability (all, available, unavailable)
+  const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "available" | "unavailable">("all");
 
   useEffect(() => {
     fetchItems();
@@ -145,6 +147,20 @@ export const AlcoholMenuManager = () => {
     }
   };
 
+  // Quick toggle availability without editing form
+  const handleToggleAvailability = async (item: AlcoholItem) => {
+    const { error } = await supabase
+      .from('alcohol')
+      .update({ available: !item.available })
+      .eq('id', item.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: `Marked as ${!item.available ? 'Available' : 'Unavailable'}` });
+      fetchItems();
+    }
+  };
+
   const resetForm = () => {
     setEditingId(null);
     setFormData({
@@ -165,7 +181,12 @@ export const AlcoholMenuManager = () => {
   // Apply filters to items list
   const filteredItems = items
     .filter((i) => (selectedCategory ? i.category === selectedCategory : true))
-    .filter((i) => (searchQuery ? i.name.toLowerCase().includes(searchQuery.toLowerCase()) : true));
+    .filter((i) => (searchQuery ? i.name.toLowerCase().includes(searchQuery.toLowerCase()) : true))
+    .filter((i) => {
+      if (availabilityFilter === "available") return i.available === true;
+      if (availabilityFilter === "unavailable") return i.available === false;
+      return true;
+    });
 
   return (
     <div className="space-y-6">
@@ -346,6 +367,11 @@ export const AlcoholMenuManager = () => {
               </Button>
             ))}
           </div>
+          <div className="flex gap-2">
+            <Button variant={availabilityFilter === "all" ? "secondary" : "outline"} size="sm" onClick={() => setAvailabilityFilter("all")}>All</Button>
+            <Button variant={availabilityFilter === "available" ? "secondary" : "outline"} size="sm" onClick={() => setAvailabilityFilter("available")}>Available</Button>
+            <Button variant={availabilityFilter === "unavailable" ? "secondary" : "outline"} size="sm" onClick={() => setAvailabilityFilter("unavailable")}>Unavailable</Button>
+          </div>
           <div>
             <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search alcohol" />
           </div>
@@ -380,6 +406,9 @@ export const AlcoholMenuManager = () => {
                   </Button>
                   <Button size="icon" variant="destructive" onClick={() => handleDelete(item.id)}>
                     <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant={item.available ? "outline" : "secondary"} onClick={() => handleToggleAvailability(item)}>
+                    {item.available ? "Mark Unavailable" : "Mark Available"}
                   </Button>
                 </div>
               </div>
