@@ -8,6 +8,19 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Pencil, Trash2, Plus } from "lucide-react";
+import { z } from "zod";
+
+const alcoholSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
+  brand: z.string().trim().max(100, "Brand must be less than 100 characters").optional().nullable(),
+  category: z.string().trim().min(1, "Category is required").max(50, "Category must be less than 50 characters"),
+  price_30ml: z.number().min(0, "Price must be positive").max(100000, "Price must be reasonable").optional().nullable(),
+  price_60ml: z.number().min(0, "Price must be positive").max(100000, "Price must be reasonable").optional().nullable(),
+  price_90ml: z.number().min(0, "Price must be positive").max(100000, "Price must be reasonable").optional().nullable(),
+  price_180ml: z.number().min(0, "Price must be positive").max(100000, "Price must be reasonable").optional().nullable(),
+  price_bottle: z.number().min(0, "Price must be positive").max(100000, "Price must be reasonable").optional().nullable(),
+  available: z.boolean(),
+});
 
 type AlcoholItem = Tables<"alcohol">;
 
@@ -38,11 +51,27 @@ export const AlcoholMenuManager = () => {
       .order('category');
     
     if (data) setItems(data);
-    if (error) console.error('Error fetching alcohol items:', error);
+    if (error) {
+      toast({ title: "Error", description: "Failed to fetch alcohol items", variant: "destructive" });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate form data
+    try {
+      alcoholSchema.parse(formData);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast({ 
+          title: "Validation Error", 
+          description: error.errors[0].message, 
+          variant: "destructive" 
+        });
+        return;
+      }
+    }
     
     if (editingId) {
       const { error } = await supabase
@@ -122,6 +151,7 @@ export const AlcoholMenuManager = () => {
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  maxLength={100}
                   required
                 />
               </div>
@@ -131,6 +161,7 @@ export const AlcoholMenuManager = () => {
                   id="brand"
                   value={formData.brand || ""}
                   onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                  maxLength={100}
                 />
               </div>
             </div>
@@ -141,6 +172,7 @@ export const AlcoholMenuManager = () => {
                 id="category"
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                maxLength={50}
                 required
               />
             </div>
@@ -152,6 +184,8 @@ export const AlcoholMenuManager = () => {
                   id="price_30ml"
                   type="number"
                   step="0.01"
+                  min="0"
+                  max="100000"
                   value={formData.price_30ml || ""}
                   onChange={(e) => setFormData({ ...formData, price_30ml: e.target.value ? parseFloat(e.target.value) : null })}
                 />
@@ -162,6 +196,8 @@ export const AlcoholMenuManager = () => {
                   id="price_60ml"
                   type="number"
                   step="0.01"
+                  min="0"
+                  max="100000"
                   value={formData.price_60ml || ""}
                   onChange={(e) => setFormData({ ...formData, price_60ml: e.target.value ? parseFloat(e.target.value) : null })}
                 />
@@ -172,6 +208,8 @@ export const AlcoholMenuManager = () => {
                   id="price_90ml"
                   type="number"
                   step="0.01"
+                  min="0"
+                  max="100000"
                   value={formData.price_90ml || ""}
                   onChange={(e) => setFormData({ ...formData, price_90ml: e.target.value ? parseFloat(e.target.value) : null })}
                 />
@@ -185,6 +223,8 @@ export const AlcoholMenuManager = () => {
                   id="price_180ml"
                   type="number"
                   step="0.01"
+                  min="0"
+                  max="100000"
                   value={formData.price_180ml || ""}
                   onChange={(e) => setFormData({ ...formData, price_180ml: e.target.value ? parseFloat(e.target.value) : null })}
                 />
@@ -195,6 +235,8 @@ export const AlcoholMenuManager = () => {
                   id="price_bottle"
                   type="number"
                   step="0.01"
+                  min="0"
+                  max="100000"
                   value={formData.price_bottle || ""}
                   onChange={(e) => setFormData({ ...formData, price_bottle: e.target.value ? parseFloat(e.target.value) : null })}
                 />

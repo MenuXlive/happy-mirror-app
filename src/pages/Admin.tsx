@@ -44,7 +44,11 @@ const Admin = () => {
         navigate('/');
       }
     } catch (error) {
-      console.error('Auth check error:', error);
+      toast({
+        title: "Access Denied",
+        description: "Unable to verify authentication",
+        variant: "destructive",
+      });
       navigate('/auth');
     } finally {
       setLoading(false);

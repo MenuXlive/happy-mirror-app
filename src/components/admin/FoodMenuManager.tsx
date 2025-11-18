@@ -9,6 +9,16 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Pencil, Trash2, Plus } from "lucide-react";
+import { z } from "zod";
+
+const foodSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
+  category: z.string().trim().min(1, "Category is required").max(50, "Category must be less than 50 characters"),
+  description: z.string().trim().max(500, "Description must be less than 500 characters").optional().nullable(),
+  price: z.number().min(0, "Price must be positive").max(100000, "Price must be reasonable"),
+  vegetarian: z.boolean(),
+  available: z.boolean(),
+});
 
 type FoodItem = Tables<"food_menu">;
 
@@ -36,11 +46,27 @@ export const FoodMenuManager = () => {
       .order('category');
     
     if (data) setItems(data);
-    if (error) console.error('Error fetching food items:', error);
+    if (error) {
+      toast({ title: "Error", description: "Failed to fetch menu items", variant: "destructive" });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate form data
+    try {
+      foodSchema.parse(formData);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast({ 
+          title: "Validation Error", 
+          description: error.errors[0].message, 
+          variant: "destructive" 
+        });
+        return;
+      }
+    }
     
     if (editingId) {
       const { error } = await supabase
@@ -117,6 +143,7 @@ export const FoodMenuManager = () => {
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  maxLength={100}
                   required
                 />
               </div>
@@ -126,6 +153,7 @@ export const FoodMenuManager = () => {
                   id="category"
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  maxLength={50}
                   required
                 />
               </div>
@@ -137,6 +165,7 @@ export const FoodMenuManager = () => {
                 id="description"
                 value={formData.description || ""}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                maxLength={500}
               />
             </div>
             
@@ -146,6 +175,8 @@ export const FoodMenuManager = () => {
                 id="price"
                 type="number"
                 step="0.01"
+                min="0"
+                max="100000"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
                 required
