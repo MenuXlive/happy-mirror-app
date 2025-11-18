@@ -63,6 +63,7 @@ const Menu = () => {
   const [view, setView] = useState<"drinks" | "food">("drinks");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [alcohol, setAlcohol] = useState<AlcoholItem[]>([]);
   const [food, setFood] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -198,6 +199,17 @@ const Menu = () => {
     // drinks view
     return activePromotions.filter((p) => ["general", "drinks", "alcohol", "beer"].includes(p.category));
   }, [activePromotions, view]);
+
+  const featuredItems = useMemo(() => {
+    const source = view === "drinks" ? alcohol : food;
+    return source.filter((it: any) => it.featured === true);
+  }, [view, alcohol, food]);
+  
+  // Debounce the search input to reduce re-renders while typing
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 250);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   
   function getPromotionsForBucket(title: string) {
     const t = title.toLowerCase();
@@ -219,11 +231,15 @@ const Menu = () => {
       if (foodTypeFilter === "nonveg") return items.filter((it) => (it as FoodItem).vegetarian === false);
       return items;
     };
-    const q = searchQuery.toLowerCase();
+    const q = debouncedQuery.toLowerCase();
     const buckets = categoriesBuckets.map((bucket) => {
       const itemsAfterType = applyFoodType(bucket.items);
-      const itemsAfterSearch = searchQuery.trim()
-        ? itemsAfterType.filter((it) => (it as any).name?.toLowerCase().includes(q))
+      const itemsAfterSearch = debouncedQuery.trim()
+        ? itemsAfterType.filter((it) => {
+            const nm = (it as any).name?.toLowerCase().includes(q);
+            const tg = Array.isArray((it as any).tags) && (it as any).tags.some((t: string) => t.toLowerCase().includes(q));
+            return nm || tg;
+          })
         : itemsAfterType;
       return { title: bucket.title, items: itemsAfterSearch };
     });
@@ -250,15 +266,19 @@ const Menu = () => {
       .map((bucket) => ({ title: bucket.title, items: applyFoodType(bucket.items) }))
       .filter((b) => b.items.length > 0);
 
-    if (!searchQuery.trim()) return buckets;
-    const q = searchQuery.toLowerCase();
+    if (!debouncedQuery.trim()) return buckets;
+    const q = debouncedQuery.toLowerCase();
     return buckets
       .map((bucket) => ({
         title: bucket.title,
-        items: bucket.items.filter((it) => (it as any).name?.toLowerCase().includes(q)),
+        items: bucket.items.filter((it) => {
+          const nm = (it as any).name?.toLowerCase().includes(q);
+          const tg = Array.isArray((it as any).tags) && (it as any).tags.some((t: string) => t.toLowerCase().includes(q));
+          return nm || tg;
+        }),
       }))
       .filter((b) => b.items.length > 0);
-  }, [visibleBuckets, searchQuery, view, foodTypeFilter]);
+  }, [visibleBuckets, debouncedQuery, view, foodTypeFilter]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -277,7 +297,7 @@ const Menu = () => {
 
         {(settings.instagram_url || settings.facebook_url || settings.website_url || settings.address || settings.phone || settings.email || settings.hours || settings.google_maps_url) && (
           <div className="mb-4">
-            <Card className="rounded-xl border bg-card/70 shadow-sm">
+            <Card className="rounded-xl border bg-background/40 backdrop-blur-lg border-white/10 dark:border-white/5 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-primary">Connect with us</CardTitle>
               </CardHeader>
@@ -394,7 +414,7 @@ const Menu = () => {
 
         {activePromotions.length > 0 && (
           <div className="mb-4">
-            <Card className="rounded-xl border bg-gradient-to-r from-amber-50 to-primary/10 border-primary/20 shadow-sm">
+            <Card className="rounded-xl border bg-gradient-to-r from-amber-50/40 to-primary/10 backdrop-blur-lg border-white/10 dark:border-white/5 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-primary">
                   <Sparkles className="h-5 w-5" /> Current Promotions
@@ -452,8 +472,8 @@ const Menu = () => {
                 <Button
                   key={chip}
                   variant={selectedCategory === chip ? "secondary" : "outline"}
-                  size="sm"
-                  className="shrink-0"
+                  size="default"
+                  className="shrink-0 min-w-[72px]"
                   onClick={() => setSelectedCategory(selectedCategory === chip ? null : chip)}
                 >
                   {chip} ({count})
@@ -467,21 +487,21 @@ const Menu = () => {
             <div className="mt-2 flex gap-2 justify-center">
               <Button
                 variant={foodTypeFilter === "all" ? "secondary" : "outline"}
-                size="sm"
+                size="default"
                 onClick={() => setFoodTypeFilter("all")}
               >
                 All
               </Button>
               <Button
                 variant={foodTypeFilter === "veg" ? "secondary" : "outline"}
-                size="sm"
+                size="default"
                 onClick={() => setFoodTypeFilter("veg")}
               >
                 Veg
               </Button>
               <Button
                 variant={foodTypeFilter === "nonveg" ? "secondary" : "outline"}
-                size="sm"
+                size="default"
                 onClick={() => setFoodTypeFilter("nonveg")}
               >
                 Non-Veg
@@ -491,6 +511,7 @@ const Menu = () => {
 
           <div className="mt-3 max-w-2xl mx-auto">
             <Input
+              className="h-11"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search items (e.g., Mojito, Paneer, Whiskey)"
@@ -498,11 +519,62 @@ const Menu = () => {
           </div>
         </div>
 
+        {/* Featured section */}
+        {featuredItems.length > 0 && (
+          <div className="mt-4 max-w-4xl mx-auto">
+            <Card className="rounded-xl border bg-background/40 backdrop-blur-lg border-white/10 dark:border-white/5 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-primary">
+                  <Sparkles className="h-5 w-5" /> Featured
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">Handpicked favorites</p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {featuredItems.slice(0, 6).map((it: any) => (
+                    <div key={it.id} className="flex justify-between items-center py-2 border-t first:border-t-0 border-border/40">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{it.name}</span>
+                        {Array.isArray(it.tags) && it.tags.includes('spicy') && (
+                          <Badge className="bg-red-600 text-white">🌶️ Spicy</Badge>
+                        )}
+                        {Array.isArray(it.tags) && it.tags.includes('gluten_free') && (
+                          <Badge className="bg-teal-600 text-white">🌾🚫 Gluten-free</Badge>
+                        )}
+                        {('vegetarian' in it) && it.vegetarian && (
+                          <Badge className="bg-green-600 text-white">🌱 Veg</Badge>
+                        )}
+                        {Array.isArray(it.tags) && it.tags.includes('vegan') && (
+                          <Badge className="bg-green-700 text-white">🌱 Vegan</Badge>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        {'price' in it ? (
+                          <div className="text-primary font-semibold">{formatCurrencyINR(it.price)}</div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2 justify-end">
+                            {alcoholPriceEntries(it as AlcoholItem).map((e) => (
+                              <Badge key={e.label} variant="outline" className="px-2.5 py-1 rounded-full">
+                                <span className="opacity-80">{e.label}</span>
+                                <span className="font-semibold ml-1">{formatCurrencyINR(e.amount)}</span>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Cards */}
         {loading ? (
           <div className="mt-6 grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {[...Array(6)].map((_, i) => (
-              <Card key={i} className="rounded-xl border bg-card/70 backdrop-blur-sm shadow-sm">
+              <Card key={i} className="rounded-xl border bg-background/40 backdrop-blur-lg border-white/10 dark:border-white/5 shadow-lg">
                 <CardHeader>
                   <Skeleton className="h-6 w-40" />
                 </CardHeader>
@@ -522,7 +594,7 @@ const Menu = () => {
         ) : (
           <div className="mt-6 grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {filteredBuckets.map((bucket) => (
-              <Card key={bucket.title} className="group rounded-xl border bg-card/70 backdrop-blur-sm shadow-sm hover:shadow-md transition">
+              <Card key={bucket.title} className="group rounded-xl border bg-background/40 backdrop-blur-lg border-white/10 dark:border-white/5 shadow-lg hover:shadow-xl transition">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-primary">
                     {view === "drinks" ? <Martini className="h-5 w-5" /> : <Utensils className="h-5 w-5" />}
@@ -547,6 +619,15 @@ const Menu = () => {
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium text-base truncate">{(item as any).name}</span>
+                              {Array.isArray((item as any).tags) && (item as any).tags.includes('spicy') && (
+                                <Badge className="bg-red-600 text-white">🌶️ Spicy</Badge>
+                              )}
+                              {Array.isArray((item as any).tags) && (item as any).tags.includes('gluten_free') && (
+                                <Badge className="bg-teal-600 text-white">🌾🚫 Gluten-free</Badge>
+                              )}
+                              {Array.isArray((item as any).tags) && (item as any).tags.includes('vegan') && (
+                                <Badge className="bg-green-700 text-white">🌱 Vegan</Badge>
+                              )}
                               {"vegetarian" in item && (
                                 <Badge className={(item as FoodItem).vegetarian ? "bg-green-600 text-white" : "bg-amber-600 text-white"}>
                                   {(item as FoodItem).vegetarian ? "Veg" : "Non-Veg"}
