@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
+import { PRESET_PROMOTIONS, getPresetByKey } from "@/lib/promotions";
 
 type AlcoholItem = Tables<"alcohol">;
 type FoodItem = Tables<"food_menu">;
@@ -66,6 +67,8 @@ const Menu = () => {
   const [loading, setLoading] = useState(true);
   // NEW: veg/non-veg filter for food
   const [foodTypeFilter, setFoodTypeFilter] = useState<"all" | "veg" | "nonveg">("all");
+  const [activePromotionKeys, setActivePromotionKeys] = useState<string[]>([]);
+  const [loadingPromotions, setLoadingPromotions] = useState(false);
 
   useEffect(() => {
     async function fetchMenu() {
@@ -89,11 +92,41 @@ const Menu = () => {
     fetchMenu();
   }, [toast]);
 
+  // Fetch active promotions (Supabase with localStorage fallback)
+  useEffect(() => {
+    async function fetchPromotions() {
+      setLoadingPromotions(true);
+      try {
+        const { data, error } = await supabase.from("promotions").select("key,active");
+        if (error) throw error;
+        const keys = (data || []).filter((r: any) => r.active).map((r: any) => r.key);
+        setActivePromotionKeys(keys);
+        try { localStorage.setItem("activePromotions", JSON.stringify(keys)); } catch {}
+      } catch (err) {
+        try {
+          const raw = localStorage.getItem("activePromotions");
+          const keys = raw ? JSON.parse(raw) : [];
+          setActivePromotionKeys(keys);
+        } catch {}
+      } finally {
+        setLoadingPromotions(false);
+      }
+    }
+    fetchPromotions();
+  }, []);
+
   const categoriesBuckets: CategoryBucket<AlcoholItem | FoodItem>[] = useMemo(() => {
     return view === "drinks" ? groupByCategory(alcohol) : groupByCategory(food);
   }, [view, alcohol, food]);
 
   const chips = useMemo(() => categoriesBuckets.map((c) => c.title), [categoriesBuckets]);
+
+  // Active promotions derived from keys
+  const activePromotions = useMemo(() => {
+    return activePromotionKeys
+      .map((k) => getPresetByKey(k))
+      .filter(Boolean) as { key: string; title: string; description: string; category: string }[];
+  }, [activePromotionKeys]);
 
   // Counts per category reflecting current search and veg/non-veg filters
   const chipCounts = useMemo(() => {
@@ -155,6 +188,23 @@ const Menu = () => {
           <h1 className="text-3xl md:text-4xl font-bold text-primary">Our Menu</h1>
           <p className="text-muted-foreground">Premium beverages and delicious cuisine</p>
         </div>
+
+        {activePromotions.length > 0 && (
+          <div className="mb-4">
+            <Card className="rounded-xl border bg-card/80">
+              <CardHeader>
+                <CardTitle className="text-primary">Current Promotions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {activePromotions.map((p) => (
+                    <Badge key={p.key} className="bg-amber-600 text-white">{p.title}</Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Sticky filter/search bar */}
         <div className="sticky top-0 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3 -mx-4 px-4 border-b">

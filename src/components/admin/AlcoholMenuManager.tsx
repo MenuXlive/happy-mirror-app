@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,7 @@ const ALCOHOL_CATEGORIES = [
 type AlcoholItem = Tables<"alcohol">;
 
 export const AlcoholMenuManager = () => {
+  const formatCurrencyINR = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
   const [items, setItems] = useState<AlcoholItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<TablesInsert<"alcohol">>>({
@@ -67,6 +68,39 @@ export const AlcoholMenuManager = () => {
   const [useCustomCategory, setUseCustomCategory] = useState(false);
   // Filter by availability (all, available, unavailable)
   const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "available" | "unavailable">("all");
+  // Bulk selection for multi-item actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(filteredItems.map((i) => i.id)));
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const bulkSetAvailability = async (makeAvailable: boolean) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      toast({ title: "No items selected", description: "Select items to apply bulk action." });
+      return;
+    }
+    const { error } = await supabase
+      .from('alcohol_menu')
+      .update({ available: makeAvailable })
+      .in('id', ids);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: `Marked ${ids.length} item(s) as ${makeAvailable ? 'Available' : 'Unavailable'}` });
+      clearSelection();
+      fetchItems();
+    }
+  };
 
   useEffect(() => {
     fetchItems();
@@ -178,6 +212,18 @@ export const AlcoholMenuManager = () => {
 
   // Derived categories from existing items
   const categories = Array.from(new Set(items.map((i) => i.category).filter(Boolean)));
+  // Availability counts per category
+  const categoryCounts = useMemo(() => {
+    const map = new Map<string, { availableCount: number; unavailableCount: number }>();
+    ALCOHOL_CATEGORIES.forEach((c) => {
+      const itemsInCat = items.filter((i) => i.category === c)
+        .filter((i) => (searchQuery ? i.name.toLowerCase().includes(searchQuery.toLowerCase()) : true));
+      const availableCount = itemsInCat.filter((i) => i.available).length;
+      const unavailableCount = itemsInCat.length - availableCount;
+      map.set(c, { availableCount, unavailableCount });
+    });
+    return map;
+  }, [items, searchQuery]);
   // Apply filters to items list
   const filteredItems = items
     .filter((i) => (selectedCategory ? i.category === selectedCategory : true))
@@ -264,7 +310,7 @@ export const AlcoholMenuManager = () => {
             
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="price_30ml">30ml ($)</Label>
+                <Label htmlFor="price_30ml">30ml (INR)</Label>
                 <Input
                   id="price_30ml"
                   type="number"
@@ -276,7 +322,7 @@ export const AlcoholMenuManager = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="price_60ml">60ml ($)</Label>
+                <Label htmlFor="price_60ml">60ml (INR)</Label>
                 <Input
                   id="price_60ml"
                   type="number"
@@ -288,7 +334,7 @@ export const AlcoholMenuManager = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="price_90ml">90ml ($)</Label>
+                <Label htmlFor="price_90ml">90ml (INR)</Label>
                 <Input
                   id="price_90ml"
                   type="number"
@@ -303,7 +349,7 @@ export const AlcoholMenuManager = () => {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="price_180ml">180ml ($)</Label>
+                <Label htmlFor="price_180ml">180ml (INR)</Label>
                 <Input
                   id="price_180ml"
                   type="number"
@@ -315,7 +361,7 @@ export const AlcoholMenuManager = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="price_bottle">Bottle ($)</Label>
+                <Label htmlFor="price_bottle">Bottle (INR)</Label>
                 <Input
                   id="price_bottle"
                   type="number"
@@ -364,6 +410,9 @@ export const AlcoholMenuManager = () => {
                 onClick={() => setSelectedCategory(selectedCategory === c ? null : c)}
               >
                 {c}
+                {categoryCounts.has(c) && (
+                  <span className="ml-2 text-xs opacity-70">A: {categoryCounts.get(c)!.availableCount} • U: {categoryCounts.get(c)!.unavailableCount}</span>
+                )}
               </Button>
             ))}
           </div>
@@ -373,7 +422,15 @@ export const AlcoholMenuManager = () => {
             <Button variant={availabilityFilter === "unavailable" ? "secondary" : "outline"} size="sm" onClick={() => setAvailabilityFilter("unavailable")}>Unavailable</Button>
           </div>
           <div>
-            <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search alcohol" />
+            <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search alcohol items" />
+          </div>
+          {/* Bulk actions */}
+          <div className="flex flex-wrap gap-2 pt-2 border-t mt-2">
+            <Button variant="outline" size="sm" onClick={selectAllVisible}>Select All (visible)</Button>
+            <Button variant="outline" size="sm" onClick={clearSelection}>Clear Selection</Button>
+            <Button variant="secondary" size="sm" onClick={() => bulkSetAvailability(true)}>Mark Available</Button>
+            <Button variant="secondary" size="sm" onClick={() => bulkSetAvailability(false)}>Mark Unavailable</Button>
+            <span className="text-xs text-muted-foreground">Selected: {selectedIds.size}</span>
           </div>
         </CardContent>
       </Card>
@@ -393,11 +450,11 @@ export const AlcoholMenuManager = () => {
                     <p className="text-sm text-muted-foreground">{item.brand}</p>
                   )}
                   <div className="flex flex-wrap gap-3 mt-2 text-sm">
-                    {item.price_30ml && <span className="text-primary">30ml: ${item.price_30ml}</span>}
-                    {item.price_60ml && <span className="text-primary">60ml: ${item.price_60ml}</span>}
-                    {item.price_90ml && <span className="text-primary">90ml: ${item.price_90ml}</span>}
-                    {item.price_180ml && <span className="text-primary">180ml: ${item.price_180ml}</span>}
-                    {item.price_bottle && <span className="text-primary">Bottle: ${item.price_bottle}</span>}
+                    {item.price_30ml && <span className="text-primary">30ml: {formatCurrencyINR(item.price_30ml)}</span>}
+                    {item.price_60ml && <span className="text-primary">60ml: {formatCurrencyINR(item.price_60ml)}</span>}
+                    {item.price_90ml && <span className="text-primary">90ml: {formatCurrencyINR(item.price_90ml)}</span>}
+                    {item.price_180ml && <span className="text-primary">180ml: {formatCurrencyINR(item.price_180ml)}</span>}
+                    {item.price_bottle && <span className="text-primary">Bottle: {formatCurrencyINR(item.price_bottle)}</span>}
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -410,6 +467,10 @@ export const AlcoholMenuManager = () => {
                   <Button size="sm" variant={item.available ? "outline" : "secondary"} onClick={() => handleToggleAvailability(item)}>
                     {item.available ? "Mark Unavailable" : "Mark Available"}
                   </Button>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
+                    Select
+                  </label>
                 </div>
               </div>
             </CardContent>

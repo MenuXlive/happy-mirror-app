@@ -7,6 +7,7 @@ import { LogOut, QrCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { FoodMenuManager } from "@/components/admin/FoodMenuManager";
 import { AlcoholMenuManager } from "@/components/admin/AlcoholMenuManager";
+import { PromotionsManager } from "@/components/admin/PromotionsManager";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -93,9 +94,10 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="food" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="food">Food Menu</TabsTrigger>
             <TabsTrigger value="alcohol">Alcohol Menu</TabsTrigger>
+            <TabsTrigger value="promotions">Promotions</TabsTrigger>
           </TabsList>
           
           <TabsContent value="food" className="mt-6">
@@ -104,6 +106,10 @@ const Admin = () => {
           
           <TabsContent value="alcohol" className="mt-6">
             <AlcoholMenuManager />
+          </TabsContent>
+          
+          <TabsContent value="promotions" className="mt-6">
+            <PromotionsManager />
           </TabsContent>
         </Tabs>
       </div>

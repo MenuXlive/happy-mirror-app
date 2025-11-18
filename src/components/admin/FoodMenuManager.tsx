@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ const FOOD_CATEGORIES = [
 type FoodItem = Tables<"food_menu">;
 
 export const FoodMenuManager = () => {
+  const formatCurrencyINR = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
   const [items, setItems] = useState<FoodItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<TablesInsert<"food_menu">>>({
@@ -62,6 +63,39 @@ export const FoodMenuManager = () => {
   const [useCustomCategory, setUseCustomCategory] = useState(false);
   // Filter by availability (all, available, unavailable)
   const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "available" | "unavailable">("all");
+  // Bulk selection for multi-item actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(filteredItems.map((i) => i.id)));
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const bulkSetAvailability = async (makeAvailable: boolean) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      toast({ title: "No items selected", description: "Select items to apply bulk action." });
+      return;
+    }
+    const { error } = await supabase
+      .from('food_menu')
+      .update({ available: makeAvailable })
+      .in('id', ids);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: `Marked ${ids.length} item(s) as ${makeAvailable ? 'Available' : 'Unavailable'}` });
+      clearSelection();
+      fetchItems();
+    }
+  };
 
   useEffect(() => {
     fetchItems();
@@ -171,6 +205,24 @@ export const FoodMenuManager = () => {
   // Derived category chips
   const categories = Array.from(new Set(items.map((i) => i.category).filter(Boolean)));
 
+  // Availability counts per category (reactive to filters/search)
+  const categoryCounts = useMemo(() => {
+    const map = new Map<string, { availableCount: number; unavailableCount: number }>();
+    categories.forEach((c) => {
+      const itemsInCat = items.filter((i) => i.category === c)
+        .filter((i) => {
+          if (vegFilter === "veg") return i.vegetarian === true;
+          if (vegFilter === "nonveg") return i.vegetarian === false;
+          return true;
+        })
+        .filter((i) => (searchQuery ? i.name.toLowerCase().includes(searchQuery.toLowerCase()) : true));
+      const availableCount = itemsInCat.filter((i) => i.available).length;
+      const unavailableCount = itemsInCat.length - availableCount;
+      map.set(c, { availableCount, unavailableCount });
+    });
+    return map;
+  }, [items, categories, vegFilter, searchQuery]);
+
   // Apply filters
   const filteredItems = items
     .filter((i) => (selectedCategory ? i.category === selectedCategory : true))
@@ -261,7 +313,7 @@ export const FoodMenuManager = () => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="price">Price ($)</Label>
+              <Label htmlFor="price">Price (INR)</Label>
               <Input
                 id="price"
                 type="number"
@@ -321,6 +373,9 @@ export const FoodMenuManager = () => {
                 onClick={() => setSelectedCategory(selectedCategory === c ? null : c)}
               >
                 {c}
+                {categoryCounts.has(c) && (
+                  <span className="ml-2 text-xs opacity-70">A: {categoryCounts.get(c)!.availableCount} • U: {categoryCounts.get(c)!.unavailableCount}</span>
+                )}
               </Button>
             ))}
           </div>
@@ -336,6 +391,14 @@ export const FoodMenuManager = () => {
           </div>
           <div>
             <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search food items" />
+          </div>
+          {/* Bulk actions */}
+          <div className="flex flex-wrap gap-2 pt-2 border-t mt-2">
+            <Button variant="outline" size="sm" onClick={selectAllVisible}>Select All (visible)</Button>
+            <Button variant="outline" size="sm" onClick={clearSelection}>Clear Selection</Button>
+            <Button variant="secondary" size="sm" onClick={() => bulkSetAvailability(true)}>Mark Available</Button>
+            <Button variant="secondary" size="sm" onClick={() => bulkSetAvailability(false)}>Mark Unavailable</Button>
+            <span className="text-xs text-muted-foreground">Selected: {selectedIds.size}</span>
           </div>
         </CardContent>
       </Card>
@@ -355,7 +418,7 @@ export const FoodMenuManager = () => {
                   {item.description && (
                     <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
                   )}
-                  <p className="text-primary font-semibold mt-2">${item.price}</p>
+                  <p className="text-primary font-semibold mt-2">{formatCurrencyINR(item.price)}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button size="icon" variant="outline" onClick={() => handleEdit(item)}>
@@ -367,6 +430,10 @@ export const FoodMenuManager = () => {
                   <Button size="sm" variant={item.available ? "outline" : "secondary"} onClick={() => handleToggleAvailability(item)}>
                     {item.available ? "Mark Unavailable" : "Mark Available"}
                   </Button>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
+                    Select
+                  </label>
                 </div>
               </div>
             </CardContent>
