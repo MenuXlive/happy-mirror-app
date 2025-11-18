@@ -8,6 +8,7 @@ import Menu from "./pages/Menu";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import MobileShell from "@/components/layout/MobileShell";
 
 const queryClient = new QueryClient();
 
@@ -17,14 +18,16 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/menu" element={<Menu />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/admin" element={<Admin />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <MobileShell>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/menu" element={<Menu />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/admin" element={<Admin />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </MobileShell>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
