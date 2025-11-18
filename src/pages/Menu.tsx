@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Martini, Utensils } from "lucide-react";
+import { ArrowLeft, Martini, Utensils, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
@@ -127,7 +127,29 @@ const Menu = () => {
       .map((k) => getPresetByKey(k))
       .filter(Boolean) as { key: string; title: string; description: string; category: string }[];
   }, [activePromotionKeys]);
-
+  
+  // Promotions filtered for current view
+  const promotionsForView = useMemo(() => {
+    if (activePromotions.length === 0) return [] as { key: string; title: string; description: string; category: string }[];
+    if (view === "food") {
+      return activePromotions.filter((p) => p.category === "food" || p.category === "general");
+    }
+    // drinks view
+    return activePromotions.filter((p) => ["general", "drinks", "alcohol", "beer"].includes(p.category));
+  }, [activePromotions, view]);
+  
+  function getPromotionsForBucket(title: string) {
+    const t = title.toLowerCase();
+    return promotionsForView.filter((p) => {
+      if (p.category === "general") return true;
+      if (view === "food") return p.category === "food";
+      // drinks view
+      if (p.category === "alcohol" || p.category === "drinks") return true;
+      if (p.category === "beer") return /beer/.test(t);
+      return false;
+    });
+  }
+  
   // Counts per category reflecting current search and veg/non-veg filters
   const chipCounts = useMemo(() => {
     const applyFoodType = (items: (AlcoholItem | FoodItem)[]) => {
@@ -191,14 +213,25 @@ const Menu = () => {
 
         {activePromotions.length > 0 && (
           <div className="mb-4">
-            <Card className="rounded-xl border bg-card/80">
+            <Card className="rounded-xl border bg-gradient-to-r from-amber-50 to-primary/10 border-primary/20 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-primary">Current Promotions</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-primary">
+                  <Sparkles className="h-5 w-5" /> Current Promotions
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">Limited-time offers — grab them while they last!</p>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid sm:grid-cols-2 gap-3">
                   {activePromotions.map((p) => (
-                    <Badge key={p.key} className="bg-amber-600 text-white">{p.title}</Badge>
+                    <div key={p.key} className="flex items-start gap-3 p-3 rounded-lg border bg-background/60 hover:bg-background/80 transition">
+                      <Badge className="bg-gradient-to-r from-amber-600 to-pink-600 text-white shadow-sm capitalize">{p.category}</Badge>
+                      <div>
+                        <div className="font-semibold leading-tight">{p.title}</div>
+                        {p.description && (
+                          <p className="text-xs mt-0.5 text-muted-foreground">{p.description}</p>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </CardContent>
@@ -314,6 +347,16 @@ const Menu = () => {
                     {view === "drinks" ? <Martini className="h-5 w-5" /> : <Utensils className="h-5 w-5" />}
                     {bucket.title}
                   </CardTitle>
+                  {/* Stylish per-category promotions chips */}
+                  {getPromotionsForBucket(bucket.title).length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {getPromotionsForBucket(bucket.title).map((p) => (
+                        <Badge key={`${bucket.title}-${p.key}`} className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm">
+                          {p.title}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-1">
