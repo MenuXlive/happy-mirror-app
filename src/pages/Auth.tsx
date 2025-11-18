@@ -4,21 +4,53 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: "Login Demo",
-      description: "This is a demo login page. Backend integration required for authentication.",
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/admin');
+      }
     });
+  }, [navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data.session) {
+        toast({
+          title: "Login Successful",
+          description: "Welcome back!",
+        });
+        navigate('/admin');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Login Failed",
+        description: error.message || "Invalid email or password",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -67,8 +99,9 @@ const Auth = () => {
               <Button 
                 type="submit" 
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                disabled={loading}
               >
-                Login
+                {loading ? "Logging in..." : "Login"}
               </Button>
             </form>
           </CardContent>
