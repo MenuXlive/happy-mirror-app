@@ -227,6 +227,15 @@ export const AlcoholMenuManager = () => {
     "Cider",
     "Liqueur",
     "Tequila",
+    // Expanded
+    "Brandy",
+    "Champagne",
+    "Sake",
+    "Soju",
+    "Mezcal",
+    "Aperitifs",
+    "Digestifs",
+    "Hard Seltzer",
   ];
   const categoriesToShow = Array.from(new Set([...presetAlcoholCategories, ...categories]));
   // Availability counts per category

@@ -70,7 +70,16 @@ const Menu = () => {
   const [foodTypeFilter, setFoodTypeFilter] = useState<"all" | "veg" | "nonveg">("all");
   const [activePromotionKeys, setActivePromotionKeys] = useState<string[]>([]);
   const [loadingPromotions, setLoadingPromotions] = useState(false);
-  const [venueSettings, setVenueSettings] = useState<{ instagram_url?: string | null; facebook_url?: string | null; website_url?: string | null; address?: string | null }>({});
+  const [settings, setSettings] = useState<{
+    instagram_url?: string | null;
+    facebook_url?: string | null;
+    website_url?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    hours?: string | null;
+    google_maps_url?: string | null;
+  }>({});
 
   useEffect(() => {
     async function fetchMenu() {
@@ -119,35 +128,39 @@ const Menu = () => {
 
   // Fetch venue settings (Supabase with localStorage fallback)
   useEffect(() => {
-    async function fetchSettings() {
+    const fetchSettings = async () => {
       try {
-        const { data, error } = await supabase
-          .from("venue_settings")
-          .select("id, instagram_url, facebook_url, website_url, address")
-          .eq("id", "default")
-          .maybeSingle();
-        if (error) throw error;
-        if (data) {
-          setVenueSettings({
-            instagram_url: data.instagram_url ?? null,
-            facebook_url: data.facebook_url ?? null,
-            website_url: data.website_url ?? null,
-            address: data.address ?? null,
-          });
-          try { localStorage.setItem("venue_settings", JSON.stringify(data)); } catch {}
+        if (supabase) {
+          const { data, error } = await supabase
+            .from("venue_settings")
+            .select("instagram_url, facebook_url, website_url, address, phone, email, hours, google_maps_url")
+            .eq("id", "default")
+            .maybeSingle();
+          if (error) throw error;
+          if (data) {
+            setSettings({
+              instagram_url: data.instagram_url ?? null,
+              facebook_url: data.facebook_url ?? null,
+              website_url: data.website_url ?? null,
+              address: data.address ?? null,
+              phone: data.phone ?? null,
+              email: data.email ?? null,
+              hours: data.hours ?? null,
+              google_maps_url: data.google_maps_url ?? null,
+            });
+          } else {
+            const raw = localStorage.getItem("venue_settings");
+            if (raw) setSettings(JSON.parse(raw));
+          }
         } else {
           const raw = localStorage.getItem("venue_settings");
-          if (raw) {
-            setVenueSettings(JSON.parse(raw));
-          }
+          if (raw) setSettings(JSON.parse(raw));
         }
-      } catch (err) {
+      } catch (e) {
         const raw = localStorage.getItem("venue_settings");
-        if (raw) {
-          try { setVenueSettings(JSON.parse(raw)); } catch {}
-        }
+        if (raw) setSettings(JSON.parse(raw));
       }
-    }
+    };
     fetchSettings();
   }, []);
 
@@ -498,3 +511,68 @@ const Menu = () => {
 };
 
 export default Menu;
+
+{/* Social & Contact Section */}
+{(settings.instagram_url || settings.facebook_url || settings.website_url || settings.address || settings.phone || settings.email || settings.hours) && (
+  <Card className="mb-6">
+    <CardHeader>
+      <CardTitle>Connect with us</CardTitle>
+    </CardHeader>
+    <CardContent className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        {settings.instagram_url && (
+          <a href={settings.instagram_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-pink-600 hover:underline">
+            <span className="i-tabler-brand-instagram w-5 h-5" />
+            Instagram
+          </a>
+        )}
+        {settings.facebook_url && (
+          <a href={settings.facebook_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-blue-600 hover:underline">
+            <span className="i-tabler-brand-facebook w-5 h-5" />
+            Facebook
+          </a>
+        )}
+        {settings.website_url && (
+          <a href={settings.website_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-primary hover:underline">
+            <span className="i-tabler-world-www w-5 h-5" />
+            Website
+          </a>
+        )}
+        {settings.google_maps_url && (
+          <a href={settings.google_maps_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-green-700 hover:underline">
+            <span className="i-tabler-map-pin w-5 h-5" />
+            Google Maps
+          </a>
+        )}
+      </div>
+      {(settings.address || settings.phone || settings.email) && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-muted-foreground">
+          {settings.address && (
+            <div className="inline-flex items-start gap-2">
+              <span className="i-tabler-map-pin w-4 h-4 mt-0.5" />
+              <span>{settings.address}</span>
+            </div>
+          )}
+          {settings.phone && (
+            <div className="inline-flex items-center gap-2">
+              <span className="i-tabler-phone w-4 h-4" />
+              <span>{settings.phone}</span>
+            </div>
+          )}
+          {settings.email && (
+            <div className="inline-flex items-center gap-2">
+              <span className="i-tabler-mail w-4 h-4" />
+              <span>{settings.email}</span>
+            </div>
+          )}
+        </div>
+      )}
+      {settings.hours && (
+        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="i-tabler-clock w-4 h-4" />
+          <span>{settings.hours}</span>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+)}

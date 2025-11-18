@@ -215,6 +215,19 @@ export const FoodMenuManager = () => {
     "Rice",
     "Salads",
     "Snacks",
+    // Expanded
+    "Sandwiches",
+    "Burgers",
+    "Pasta",
+    "Pizza",
+    "Chinese",
+    "Indian",
+    "Continental",
+    "Tandoor",
+    "Biryani",
+    "Seafood",
+    "Breakfast",
+    "Beverages",
   ];
   const categoriesToShow = Array.from(new Set([...presetFoodCategories, ...categories]));
 

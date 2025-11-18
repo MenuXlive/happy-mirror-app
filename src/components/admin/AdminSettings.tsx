@@ -17,6 +17,10 @@ export type VenueSettings = {
   facebook_url?: string | null;
   website_url?: string | null;
   address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  hours?: string | null; // free text for now (e.g., Mon-Fri 9am-11pm; Sat-Sun 10am-12am)
+  google_maps_url?: string | null;
   updated_at?: string | null;
 };
 
@@ -26,7 +30,7 @@ const LS_KEY = "venue_settings";
 export default function AdminSettings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState<VenueSettings>({ id: DEFAULT_ID, instagram_url: "", facebook_url: "", website_url: "", address: "" });
+  const [form, setForm] = useState<VenueSettings>({ id: DEFAULT_ID, instagram_url: "", facebook_url: "", website_url: "", address: "", phone: "", email: "", hours: "", google_maps_url: "" });
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -35,7 +39,7 @@ export default function AdminSettings() {
         if (supabase) {
           const { data, error } = await supabase
             .from("venue_settings")
-            .select("id, instagram_url, facebook_url, website_url, address, updated_at")
+            .select("id, instagram_url, facebook_url, website_url, address, phone, email, hours, google_maps_url, updated_at")
             .eq("id", DEFAULT_ID)
             .maybeSingle();
           if (error) throw error;
@@ -46,6 +50,10 @@ export default function AdminSettings() {
               facebook_url: data.facebook_url ?? "",
               website_url: data.website_url ?? "",
               address: data.address ?? "",
+              phone: data.phone ?? "",
+              email: data.email ?? "",
+              hours: data.hours ?? "",
+              google_maps_url: data.google_maps_url ?? "",
               updated_at: data.updated_at ?? null,
             });
           } else {
@@ -87,6 +95,10 @@ export default function AdminSettings() {
         facebook_url: form.facebook_url || null,
         website_url: form.website_url || null,
         address: form.address || null,
+        phone: form.phone || null,
+        email: form.email || null,
+        hours: form.hours || null,
+        google_maps_url: form.google_maps_url || null,
         updated_at: new Date().toISOString(),
       };
       if (supabase) {
@@ -137,6 +149,34 @@ export default function AdminSettings() {
                 onChange={(e) => setForm((f) => ({ ...f, website_url: e.target.value }))}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="google_maps_url">Google Maps URL</Label>
+              <Input
+                id="google_maps_url"
+                placeholder="https://maps.google.com/?q=..."
+                value={form.google_maps_url || ""}
+                onChange={(e) => setForm((f) => ({ ...f, google_maps_url: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                placeholder="+91 98765 43210"
+                value={form.phone || ""}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                placeholder="contact@yourdomain.com"
+                type="email"
+                value={form.email || ""}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="address">Address</Label>
               <Input
@@ -144,6 +184,15 @@ export default function AdminSettings() {
                 placeholder="123 Main Street, City"
                 value={form.address || ""}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="hours">Hours</Label>
+              <Input
+                id="hours"
+                placeholder="Mon-Fri 9am-11pm; Sat-Sun 10am-12am"
+                value={form.hours || ""}
+                onChange={(e) => setForm((f) => ({ ...f, hours: e.target.value }))}
               />
             </div>
           </div>
