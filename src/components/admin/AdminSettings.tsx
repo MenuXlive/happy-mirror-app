@@ -22,6 +22,7 @@ export type VenueSettings = {
   email?: string | null;
   hours?: string | null; // free text for now (e.g., Mon-Fri 9am-11pm; Sat-Sun 10am-12am)
   google_maps_url?: string | null;
+  embed_url?: string | null; // optional advanced embed URL (https://www.google.com/maps/embed?pb=...)
   show_map_embed?: boolean | null;
   updated_at?: string | null;
 };
@@ -32,7 +33,7 @@ const LS_KEY = "venue_settings";
 export default function AdminSettings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState<VenueSettings>({ id: DEFAULT_ID, instagram_url: "", facebook_url: "", website_url: "", address: "", phone: "", email: "", hours: "", google_maps_url: "", show_map_embed: false });
+  const [form, setForm] = useState<VenueSettings>({ id: DEFAULT_ID, instagram_url: "", facebook_url: "", website_url: "", address: "", phone: "", email: "", hours: "", google_maps_url: "", embed_url: "", show_map_embed: false });
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -41,7 +42,7 @@ export default function AdminSettings() {
         if (supabase) {
           const { data, error } = await supabase
             .from("venue_settings")
-            .select("id, instagram_url, facebook_url, website_url, address, phone, email, hours, google_maps_url, show_map_embed, updated_at")
+            .select("id, instagram_url, facebook_url, website_url, address, phone, email, hours, google_maps_url, embed_url, show_map_embed, updated_at")
             .eq("id", DEFAULT_ID)
             .maybeSingle();
           if (error) throw error;
@@ -56,6 +57,7 @@ export default function AdminSettings() {
               email: data.email ?? "",
               hours: data.hours ?? "",
               google_maps_url: data.google_maps_url ?? "",
+              embed_url: data.embed_url ?? "",
               show_map_embed: data.show_map_embed ?? false,
               updated_at: data.updated_at ?? null,
             });
@@ -102,6 +104,7 @@ export default function AdminSettings() {
         email: form.email || null,
         hours: form.hours || null,
         google_maps_url: form.google_maps_url || null,
+        embed_url: form.embed_url || null,
         show_map_embed: !!form.show_map_embed,
         updated_at: new Date().toISOString(),
       };
@@ -163,6 +166,16 @@ export default function AdminSettings() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="embed_url">Google Maps Embed URL (advanced)</Label>
+              <Input
+                id="embed_url"
+                placeholder="https://www.google.com/maps/embed?pb=..."
+                value={form.embed_url || ""}
+                onChange={(e) => setForm((f) => ({ ...f, embed_url: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">Paste the official Google Maps Embed URL for complex place pages. If provided, this will be used directly.</p>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
               <Input
                 id="phone"
@@ -201,9 +214,9 @@ export default function AdminSettings() {
             </div>
             <div className="flex items-center gap-3 md:col-span-2">
               <Switch id="show_map_embed" checked={!!form.show_map_embed} onCheckedChange={(val) => setForm((f) => ({ ...f, show_map_embed: val }))} />
-              <Label htmlFor="show_map_embed">Show Google Map embed below contact card</Label>
+              <Label htmlFor="show_map_embed">Show Google Map embed alongside contact card</Label>
             </div>
-            <p className="text-xs text-muted-foreground md:col-span-2">Tip: Use a maps.google.com URL with a ?q= query (e.g., https://maps.google.com/?q=Your+Place). We’ll auto-generate an embed from it.</p>
+            <p className="text-xs text-muted-foreground md:col-span-2">Tip: Provide either a Google Maps URL with ?q=... or paste an official Embed URL. We’ll render the best available map.</p>
           </div>
           <div className="flex gap-2">
             <Button onClick={save} disabled={loading} className="bg-primary">
