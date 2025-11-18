@@ -89,25 +89,62 @@ const Menu = () => {
 }>({ id: "default", instagram_url: "", facebook_url: "", website_url: "", address: "", phone: "", email: "", hours: "", google_maps_url: "", embed_url: "", show_map_embed: false, bar_name: "", logo_url: "" });
 
   useEffect(() => {
-    async function fetchMenu() {
-      setLoading(true);
+    let mounted = true;
+
+    // 1) Try cached data first for instant render
+    try {
+      const alcoholCache = localStorage.getItem("alcohol_cache");
+      const foodCache = localStorage.getItem("food_cache");
+      if (alcoholCache || foodCache) {
+        const a = alcoholCache ? JSON.parse(alcoholCache) : [];
+        const f = foodCache ? JSON.parse(foodCache) : [];
+        if (mounted) {
+          setAlcohol(Array.isArray(a) ? a : []);
+          setFood(Array.isArray(f) ? f : []);
+          setLoading(false);
+        }
+      } else {
+        setLoading(true);
+      }
+    } catch {}
+
+    // 2) Fetch fresh data with a timeout safeguard
+    async function fetchMenuFresh() {
       try {
-        const [{ data: alcoholData, error: alcoholError }, { data: foodData, error: foodError }] = await Promise.all([
-          supabase.from("alcohol").select("*").eq("available", true).order("category"),
-          supabase.from("food_menu").select("*").eq("available", true).order("category"),
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Menu fetch timeout")), 5000));
+        const alcoholReq = supabase.from("alcohol").select("*").eq("available", true).order("category");
+        const foodReq = supabase.from("food_menu").select("*").eq("available", true).order("category");
+        const [alcoholRes, foodRes]: any = await Promise.all([
+          Promise.race([alcoholReq, timeout]),
+          Promise.race([foodReq, timeout]),
         ]);
-        if (alcoholError) throw alcoholError;
-        if (foodError) throw foodError;
-        setAlcohol(alcoholData || []);
-        setFood(foodData || []);
+        if (alcoholRes?.error) throw alcoholRes.error;
+        if (foodRes?.error) throw foodRes.error;
+        const alcoholData = alcoholRes?.data || [];
+        const foodData = foodRes?.data || [];
+        if (mounted) {
+          setAlcohol(alcoholData);
+          setFood(foodData);
+          setLoading(false);
+        }
+        try {
+          localStorage.setItem("alcohol_cache", JSON.stringify(alcoholData));
+          localStorage.setItem("food_cache", JSON.stringify(foodData));
+        } catch {}
       } catch (err: any) {
         console.error("Menu fetch error:", err?.message || err);
-        toast({ title: "Unable to load menu", description: "Please check your connection or try again.", variant: "destructive" });
-      } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
+        // Keep showing cached data if any; show toast if nothing cached
+        if (!(alcohol.length > 0 || food.length > 0)) {
+          toast({ title: "Unable to load menu", description: "Please check your connection or try again.", variant: "destructive" });
+        }
       }
     }
-    fetchMenu();
+
+    fetchMenuFresh();
+    return () => {
+      mounted = false;
+    };
   }, [toast]);
 
   // Fetch active promotions (Supabase with localStorage fallback)
