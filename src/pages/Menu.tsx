@@ -44,6 +44,17 @@ function formatAlcoholPrices(item: AlcoholItem) {
   return parts.join(" • ");
 }
 
+// Present alcohol price tiers as compact, readable chips
+function alcoholPriceEntries(item: AlcoholItem) {
+  const entries: { label: string; amount: number }[] = [];
+  if (item.price_30ml != null) entries.push({ label: "30ml", amount: item.price_30ml });
+  if (item.price_60ml != null) entries.push({ label: "60ml", amount: item.price_60ml });
+  if (item.price_90ml != null) entries.push({ label: "90ml", amount: item.price_90ml });
+  if (item.price_180ml != null) entries.push({ label: "180ml", amount: item.price_180ml });
+  if (item.price_bottle != null) entries.push({ label: "Bottle", amount: item.price_bottle });
+  return entries;
+}
+
 const Menu = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -53,6 +64,8 @@ const Menu = () => {
   const [alcohol, setAlcohol] = useState<AlcoholItem[]>([]);
   const [food, setFood] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // NEW: veg/non-veg filter for food
+  const [foodTypeFilter, setFoodTypeFilter] = useState<"all" | "veg" | "nonveg">("all");
 
   useEffect(() => {
     async function fetchMenu() {
@@ -82,21 +95,54 @@ const Menu = () => {
 
   const chips = useMemo(() => categoriesBuckets.map((c) => c.title), [categoriesBuckets]);
 
+  // Counts per category reflecting current search and veg/non-veg filters
+  const chipCounts = useMemo(() => {
+    const applyFoodType = (items: (AlcoholItem | FoodItem)[]) => {
+      if (view !== "food") return items;
+      if (foodTypeFilter === "veg") return items.filter((it) => (it as FoodItem).vegetarian === true);
+      if (foodTypeFilter === "nonveg") return items.filter((it) => (it as FoodItem).vegetarian === false);
+      return items;
+    };
+    const q = searchQuery.toLowerCase();
+    const buckets = categoriesBuckets.map((bucket) => {
+      const itemsAfterType = applyFoodType(bucket.items);
+      const itemsAfterSearch = searchQuery.trim()
+        ? itemsAfterType.filter((it) => (it as any).name?.toLowerCase().includes(q))
+        : itemsAfterType;
+      return { title: bucket.title, items: itemsAfterSearch };
+    });
+    const m = new Map<string, number>();
+    buckets.forEach((b) => m.set(b.title, b.items.length));
+    return m;
+  }, [categoriesBuckets, view, foodTypeFilter, searchQuery]);
+
   const visibleBuckets = useMemo(
     () => (selectedCategory ? categoriesBuckets.filter((c) => c.title === selectedCategory) : categoriesBuckets),
     [categoriesBuckets, selectedCategory],
   );
 
   const filteredBuckets = useMemo(() => {
-    if (!searchQuery.trim()) return visibleBuckets;
+    // Apply veg/non-veg filter when viewing food
+    const applyFoodType = (items: (AlcoholItem | FoodItem)[]) => {
+      if (view !== "food") return items;
+      if (foodTypeFilter === "veg") return items.filter((it) => (it as FoodItem).vegetarian === true);
+      if (foodTypeFilter === "nonveg") return items.filter((it) => (it as FoodItem).vegetarian === false);
+      return items;
+    };
+
+    const buckets = visibleBuckets
+      .map((bucket) => ({ title: bucket.title, items: applyFoodType(bucket.items) }))
+      .filter((b) => b.items.length > 0);
+
+    if (!searchQuery.trim()) return buckets;
     const q = searchQuery.toLowerCase();
-    return visibleBuckets
+    return buckets
       .map((bucket) => ({
         title: bucket.title,
         items: bucket.items.filter((it) => (it as any).name?.toLowerCase().includes(q)),
       }))
       .filter((b) => b.items.length > 0);
-  }, [visibleBuckets, searchQuery]);
+  }, [visibleBuckets, searchQuery, view, foodTypeFilter]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -136,18 +182,48 @@ const Menu = () => {
           </div>
 
           <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar py-1">
-            {chips.map((chip) => (
-              <Button
-                key={chip}
-                variant={selectedCategory === chip ? "secondary" : "outline"}
-                size="sm"
-                className="shrink-0"
-                onClick={() => setSelectedCategory(selectedCategory === chip ? null : chip)}
-              >
-                {chip}
-              </Button>
-            ))}
+            {chips.map((chip) => {
+              const count = chipCounts.get(chip) ?? 0;
+              return (
+                <Button
+                  key={chip}
+                  variant={selectedCategory === chip ? "secondary" : "outline"}
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => setSelectedCategory(selectedCategory === chip ? null : chip)}
+                >
+                  {chip} ({count})
+                </Button>
+              );
+            })}
           </div>
+
+          {/* NEW: Veg / Non-Veg filter when viewing Food */}
+          {view === "food" && (
+            <div className="mt-2 flex gap-2 justify-center">
+              <Button
+                variant={foodTypeFilter === "all" ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setFoodTypeFilter("all")}
+              >
+                All
+              </Button>
+              <Button
+                variant={foodTypeFilter === "veg" ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setFoodTypeFilter("veg")}
+              >
+                Veg
+              </Button>
+              <Button
+                variant={foodTypeFilter === "nonveg" ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setFoodTypeFilter("nonveg")}
+              >
+                Non-Veg
+              </Button>
+            </div>
+          )}
 
           <div className="mt-3 max-w-2xl mx-auto">
             <Input
@@ -190,30 +266,42 @@ const Menu = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
+                  <div className="space-y-1">
                     {bucket.items.map((item) => (
-                      <div key={(item as any).id} className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{(item as any).name}</span>
-                            {"vegetarian" in item && (
-                              <Badge className={(item as FoodItem).vegetarian ? "bg-green-600 text-white" : "bg-amber-600 text-white"}>
-                                {(item as FoodItem).vegetarian ? "Veg" : "Non-Veg"}
-                              </Badge>
+                      <div key={(item as any).id} className="py-3 first:pt-0 border-t border-border/40 first:border-t-0">
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-base truncate">{(item as any).name}</span>
+                              {"vegetarian" in item && (
+                                <Badge className={(item as FoodItem).vegetarian ? "bg-green-600 text-white" : "bg-amber-600 text-white"}>
+                                  {(item as FoodItem).vegetarian ? "Veg" : "Non-Veg"}
+                                </Badge>
+                              )}
+                            </div>
+                            {"description" in item && (item as FoodItem).description && (
+                              <p className="text-sm leading-relaxed text-muted-foreground mt-1">{(item as FoodItem).description}</p>
+                            )}
+                            {"brand" in item && (item as AlcoholItem).brand && (
+                              <p className="text-xs leading-relaxed text-muted-foreground mt-0.5">{(item as AlcoholItem).brand}</p>
                             )}
                           </div>
-                          {"price" in item ? (
-                            <span className="text-primary font-semibold">{formatCurrencyINR((item as FoodItem).price)}</span>
-                          ) : (
-                            <span className="text-primary font-semibold text-sm">{formatAlcoholPrices(item as AlcoholItem)}</span>
-                          )}
+
+                          <div className="flex-shrink-0 text-right">
+                            {"price" in item ? (
+                              <div className="text-primary font-semibold text-base">{formatCurrencyINR((item as FoodItem).price)}</div>
+                            ) : (
+                              <div className="flex flex-wrap gap-2 justify-end">
+                                {alcoholPriceEntries(item as AlcoholItem).map((e) => (
+                                  <Badge key={e.label} variant="outline" className="px-2.5 py-1 rounded-full">
+                                    <span className="opacity-80">{e.label}</span>
+                                    <span className="font-semibold ml-1">{formatCurrencyINR(e.amount)}</span>
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        {"description" in item && (item as FoodItem).description && (
-                          <p className="text-sm text-muted-foreground">{(item as FoodItem).description}</p>
-                        )}
-                        {"brand" in item && (item as AlcoholItem).brand && (
-                          <p className="text-xs text-muted-foreground">{(item as AlcoholItem).brand}</p>
-                        )}
                       </div>
                     ))}
                   </div>

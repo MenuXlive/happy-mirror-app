@@ -20,6 +20,26 @@ const foodSchema = z.object({
   available: z.boolean(),
 });
 
+// Canonical food categories
+const FOOD_CATEGORIES = [
+  "Starter",
+  "Main Course",
+  "Sides",
+  "Dessert",
+  "Beverages",
+  "Salad",
+  "Soup",
+  "Pizza",
+  "Burger",
+  "Sandwich",
+  "Rice",
+  "Biryani",
+  "Noodles",
+  "Bread",
+  "Curry",
+  "Tandoori",
+];
+
 type FoodItem = Tables<"food_menu">;
 
 export const FoodMenuManager = () => {
@@ -34,6 +54,12 @@ export const FoodMenuManager = () => {
     available: true,
   });
   const { toast } = useToast();
+  // NEW: admin-side filters for easy access
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [vegFilter, setVegFilter] = useState<"all" | "veg" | "nonveg">("all");
+  // Controls whether we use a custom category text input
+  const [useCustomCategory, setUseCustomCategory] = useState(false);
 
   useEffect(() => {
     fetchItems();
@@ -126,6 +152,19 @@ export const FoodMenuManager = () => {
     });
   };
 
+  // Derived category chips
+  const categories = Array.from(new Set(items.map((i) => i.category).filter(Boolean)));
+
+  // Apply filters
+  const filteredItems = items
+    .filter((i) => (selectedCategory ? i.category === selectedCategory : true))
+    .filter((i) => {
+      if (vegFilter === "veg") return i.vegetarian === true;
+      if (vegFilter === "nonveg") return i.vegetarian === false;
+      return true;
+    })
+    .filter((i) => (searchQuery ? i.name.toLowerCase().includes(searchQuery.toLowerCase()) : true));
+
   return (
     <div className="space-y-6">
       <Card className="bg-card border-border">
@@ -149,13 +188,44 @@ export const FoodMenuManager = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Input
+                <select
                   id="category"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  maxLength={50}
+                  className="h-10 px-3 border rounded-md bg-background text-foreground"
+                  value={useCustomCategory ? "__custom__" : (formData.category || "")}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "__custom__") {
+                      setUseCustomCategory(true);
+                      setFormData({ ...formData, category: "" });
+                    } else {
+                      setUseCustomCategory(false);
+                      setFormData({ ...formData, category: val });
+                    }
+                  }}
                   required
-                />
+                >
+                  <option value="" disabled>
+                    Select category
+                  </option>
+                  {FOOD_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                  <option value="__custom__">Custom...</option>
+                </select>
+                {useCustomCategory && (
+                  <div className="mt-2">
+                    <Input
+                      id="custom_category"
+                      placeholder="Enter custom category"
+                      value={formData.category || ""}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      maxLength={50}
+                      required
+                    />
+                  </div>
+                )}
               </div>
             </div>
             
@@ -218,8 +288,34 @@ export const FoodMenuManager = () => {
         </CardContent>
       </Card>
 
+      {/* NEW: admin filter toolbar */}
+      <Card className="bg-card border-border">
+        <CardContent className="pt-6 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {categories.map((c) => (
+              <Button
+                key={c}
+                variant={selectedCategory === c ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setSelectedCategory(selectedCategory === c ? null : c)}
+              >
+                {c}
+              </Button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Button variant={vegFilter === "all" ? "secondary" : "outline"} size="sm" onClick={() => setVegFilter("all")}>All</Button>
+            <Button variant={vegFilter === "veg" ? "secondary" : "outline"} size="sm" onClick={() => setVegFilter("veg")}>Veg</Button>
+            <Button variant={vegFilter === "nonveg" ? "secondary" : "outline"} size="sm" onClick={() => setVegFilter("nonveg")}>Non-Veg</Button>
+          </div>
+          <div>
+            <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search food items" />
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="space-y-4">
-        {items.map((item) => (
+        {filteredItems.map((item) => (
           <Card key={item.id} className="bg-card border-border">
             <CardContent className="pt-6">
               <div className="flex justify-between items-start">
