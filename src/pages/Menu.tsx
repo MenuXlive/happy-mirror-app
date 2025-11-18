@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 import { PRESET_PROMOTIONS, getPresetByKey } from "@/lib/promotions";
-import { Instagram, Facebook, MapPin, Globe } from "lucide-react";
+import { Instagram, Facebook, MapPin, Globe, Phone, Mail, Clock } from "lucide-react";
 
 type AlcoholItem = Tables<"alcohol">;
 type FoodItem = Tables<"food_menu">;
@@ -71,15 +71,18 @@ const Menu = () => {
   const [activePromotionKeys, setActivePromotionKeys] = useState<string[]>([]);
   const [loadingPromotions, setLoadingPromotions] = useState(false);
   const [settings, setSettings] = useState<{
-    instagram_url?: string | null;
-    facebook_url?: string | null;
-    website_url?: string | null;
-    address?: string | null;
-    phone?: string | null;
-    email?: string | null;
-    hours?: string | null;
-    google_maps_url?: string | null;
-  }>({});
+  instagram_url?: string | null;
+  facebook_url?: string | null;
+  website_url?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  hours?: string | null;
+  google_maps_url?: string | null;
+  show_map_embed?: boolean | null;
+  updated_at?: string | null;
+  id?: string;
+}>({ id: "default", instagram_url: "", facebook_url: "", website_url: "", address: "", phone: "", email: "", hours: "", google_maps_url: "", show_map_embed: false });
 
   useEffect(() => {
     async function fetchMenu() {
@@ -133,20 +136,23 @@ const Menu = () => {
         if (supabase) {
           const { data, error } = await supabase
             .from("venue_settings")
-            .select("instagram_url, facebook_url, website_url, address, phone, email, hours, google_maps_url")
+            .select("id, instagram_url, facebook_url, website_url, address, phone, email, hours, google_maps_url, show_map_embed, updated_at")
             .eq("id", "default")
             .maybeSingle();
           if (error) throw error;
           if (data) {
             setSettings({
-              instagram_url: data.instagram_url ?? null,
-              facebook_url: data.facebook_url ?? null,
-              website_url: data.website_url ?? null,
-              address: data.address ?? null,
-              phone: data.phone ?? null,
-              email: data.email ?? null,
-              hours: data.hours ?? null,
-              google_maps_url: data.google_maps_url ?? null,
+              id: "default",
+              instagram_url: data.instagram_url ?? "",
+              facebook_url: data.facebook_url ?? "",
+              website_url: data.website_url ?? "",
+              address: data.address ?? "",
+              phone: data.phone ?? "",
+              email: data.email ?? "",
+              hours: data.hours ?? "",
+              google_maps_url: data.google_maps_url ?? "",
+              show_map_embed: data.show_map_embed ?? false,
+              updated_at: data.updated_at ?? null,
             });
           } else {
             const raw = localStorage.getItem("venue_settings");
@@ -260,7 +266,7 @@ const Menu = () => {
           <p className="text-muted-foreground">Premium beverages and delicious cuisine</p>
         </div>
 
-        {(venueSettings.instagram_url || venueSettings.facebook_url || venueSettings.website_url || venueSettings.address) && (
+        {(settings.instagram_url || settings.facebook_url || settings.website_url || settings.address || settings.phone || settings.email || settings.hours || settings.google_maps_url) && (
           <div className="mb-4">
             <Card className="rounded-xl border bg-card/70 shadow-sm">
               <CardHeader>
@@ -268,9 +274,9 @@ const Menu = () => {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap items-center gap-3">
-                  {venueSettings.instagram_url && (
+                  {settings.instagram_url && (
                     <a
-                      href={venueSettings.instagram_url!}
+                      href={settings.instagram_url!}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-2 px-3 py-2 rounded-md border hover:bg-background"
@@ -279,9 +285,9 @@ const Menu = () => {
                       <span className="text-sm">Instagram</span>
                     </a>
                   )}
-                  {venueSettings.facebook_url && (
+                  {settings.facebook_url && (
                     <a
-                      href={venueSettings.facebook_url!}
+                      href={settings.facebook_url!}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-2 px-3 py-2 rounded-md border hover:bg-background"
@@ -290,9 +296,9 @@ const Menu = () => {
                       <span className="text-sm">Facebook</span>
                     </a>
                   )}
-                  {venueSettings.website_url && (
+                  {settings.website_url && (
                     <a
-                      href={venueSettings.website_url!}
+                      href={settings.website_url!}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-2 px-3 py-2 rounded-md border hover:bg-background"
@@ -301,15 +307,66 @@ const Menu = () => {
                       <span className="text-sm">Website</span>
                     </a>
                   )}
-                  {venueSettings.address && (
+                  {settings.google_maps_url && (
+                    <a
+                      href={settings.google_maps_url!}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-md border hover:bg-background"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      <span className="text-sm">Google Maps</span>
+                    </a>
+                  )}
+                  {settings.phone && (
+                    <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md border">
+                      <Phone className="h-4 w-4" />
+                      <span className="text-sm">{settings.phone}</span>
+                    </div>
+                  )}
+                  {settings.email && (
+                    <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md border">
+                      <Mail className="h-4 w-4" />
+                      <span className="text-sm">{settings.email}</span>
+                    </div>
+                  )}
+                  {settings.address && (
                     <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md border">
                       <MapPin className="h-4 w-4" />
-                      <span className="text-sm truncate max-w-[280px]">{venueSettings.address}</span>
+                      <span className="text-sm truncate max-w-[280px]">{settings.address}</span>
                     </div>
                   )}
                 </div>
+                {settings.hours && (
+                  <div className="inline-flex items-center gap-2 mt-3 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>{settings.hours}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
+            {settings.show_map_embed && settings.google_maps_url && (
+              <div className="mt-3 rounded-xl overflow-hidden border">
+                <iframe
+                  src={(() => {
+                    const base = "https://www.google.com/maps";
+                    const url = settings.google_maps_url!;
+                    try {
+                      const u = new URL(url);
+                      const q = u.searchParams.get("q");
+                      return `${base}?q=${encodeURIComponent(q || url)}&output=embed`;
+                    } catch {
+                      return `${base}?q=${encodeURIComponent(url)}&output=embed`;
+                    }
+                  })()}
+                  width="100%"
+                  height="260"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  className="w-full h-[260px]"
+                ></iframe>
+              </div>
+            )}
           </div>
         )}
 
@@ -511,68 +568,3 @@ const Menu = () => {
 };
 
 export default Menu;
-
-{/* Social & Contact Section */}
-{(settings.instagram_url || settings.facebook_url || settings.website_url || settings.address || settings.phone || settings.email || settings.hours) && (
-  <Card className="mb-6">
-    <CardHeader>
-      <CardTitle>Connect with us</CardTitle>
-    </CardHeader>
-    <CardContent className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        {settings.instagram_url && (
-          <a href={settings.instagram_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-pink-600 hover:underline">
-            <span className="i-tabler-brand-instagram w-5 h-5" />
-            Instagram
-          </a>
-        )}
-        {settings.facebook_url && (
-          <a href={settings.facebook_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-blue-600 hover:underline">
-            <span className="i-tabler-brand-facebook w-5 h-5" />
-            Facebook
-          </a>
-        )}
-        {settings.website_url && (
-          <a href={settings.website_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-primary hover:underline">
-            <span className="i-tabler-world-www w-5 h-5" />
-            Website
-          </a>
-        )}
-        {settings.google_maps_url && (
-          <a href={settings.google_maps_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-green-700 hover:underline">
-            <span className="i-tabler-map-pin w-5 h-5" />
-            Google Maps
-          </a>
-        )}
-      </div>
-      {(settings.address || settings.phone || settings.email) && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-muted-foreground">
-          {settings.address && (
-            <div className="inline-flex items-start gap-2">
-              <span className="i-tabler-map-pin w-4 h-4 mt-0.5" />
-              <span>{settings.address}</span>
-            </div>
-          )}
-          {settings.phone && (
-            <div className="inline-flex items-center gap-2">
-              <span className="i-tabler-phone w-4 h-4" />
-              <span>{settings.phone}</span>
-            </div>
-          )}
-          {settings.email && (
-            <div className="inline-flex items-center gap-2">
-              <span className="i-tabler-mail w-4 h-4" />
-              <span>{settings.email}</span>
-            </div>
-          )}
-        </div>
-      )}
-      {settings.hours && (
-        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-          <span className="i-tabler-clock w-4 h-4" />
-          <span>{settings.hours}</span>
-        </div>
-      )}
-    </CardContent>
-  </Card>
-)}

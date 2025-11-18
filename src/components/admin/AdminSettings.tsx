@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { createClient } from "@supabase/supabase-js";
+import { Switch } from "@/components/ui/switch";
 
 // Simple Supabase helper that respects existing env vars
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -21,6 +22,7 @@ export type VenueSettings = {
   email?: string | null;
   hours?: string | null; // free text for now (e.g., Mon-Fri 9am-11pm; Sat-Sun 10am-12am)
   google_maps_url?: string | null;
+  show_map_embed?: boolean | null;
   updated_at?: string | null;
 };
 
@@ -30,7 +32,7 @@ const LS_KEY = "venue_settings";
 export default function AdminSettings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState<VenueSettings>({ id: DEFAULT_ID, instagram_url: "", facebook_url: "", website_url: "", address: "", phone: "", email: "", hours: "", google_maps_url: "" });
+  const [form, setForm] = useState<VenueSettings>({ id: DEFAULT_ID, instagram_url: "", facebook_url: "", website_url: "", address: "", phone: "", email: "", hours: "", google_maps_url: "", show_map_embed: false });
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -39,7 +41,7 @@ export default function AdminSettings() {
         if (supabase) {
           const { data, error } = await supabase
             .from("venue_settings")
-            .select("id, instagram_url, facebook_url, website_url, address, phone, email, hours, google_maps_url, updated_at")
+            .select("id, instagram_url, facebook_url, website_url, address, phone, email, hours, google_maps_url, show_map_embed, updated_at")
             .eq("id", DEFAULT_ID)
             .maybeSingle();
           if (error) throw error;
@@ -54,6 +56,7 @@ export default function AdminSettings() {
               email: data.email ?? "",
               hours: data.hours ?? "",
               google_maps_url: data.google_maps_url ?? "",
+              show_map_embed: data.show_map_embed ?? false,
               updated_at: data.updated_at ?? null,
             });
           } else {
@@ -99,6 +102,7 @@ export default function AdminSettings() {
         email: form.email || null,
         hours: form.hours || null,
         google_maps_url: form.google_maps_url || null,
+        show_map_embed: !!form.show_map_embed,
         updated_at: new Date().toISOString(),
       };
       if (supabase) {
@@ -195,6 +199,11 @@ export default function AdminSettings() {
                 onChange={(e) => setForm((f) => ({ ...f, hours: e.target.value }))}
               />
             </div>
+            <div className="flex items-center gap-3 md:col-span-2">
+              <Switch id="show_map_embed" checked={!!form.show_map_embed} onCheckedChange={(val) => setForm((f) => ({ ...f, show_map_embed: val }))} />
+              <Label htmlFor="show_map_embed">Show Google Map embed below contact card</Label>
+            </div>
+            <p className="text-xs text-muted-foreground md:col-span-2">Tip: Use a maps.google.com URL with a ?q= query (e.g., https://maps.google.com/?q=Your+Place). We’ll auto-generate an embed from it.</p>
           </div>
           <div className="flex gap-2">
             <Button onClick={save} disabled={loading} className="bg-primary">
