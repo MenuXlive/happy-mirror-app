@@ -24,6 +24,8 @@ export type VenueSettings = {
   google_maps_url?: string | null;
   embed_url?: string | null; // optional advanced embed URL (https://www.google.com/maps/embed?pb=...)
   show_map_embed?: boolean | null;
+  bar_name?: string | null;
+  logo_url?: string | null;
   updated_at?: string | null;
 };
 
@@ -33,7 +35,7 @@ const LS_KEY = "venue_settings";
 export default function AdminSettings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState<VenueSettings>({ id: DEFAULT_ID, instagram_url: "", facebook_url: "", website_url: "", address: "", phone: "", email: "", hours: "", google_maps_url: "", embed_url: "", show_map_embed: false });
+  const [form, setForm] = useState<VenueSettings>({ id: DEFAULT_ID, instagram_url: "", facebook_url: "", website_url: "", address: "", phone: "", email: "", hours: "", google_maps_url: "", embed_url: "", show_map_embed: false, bar_name: "", logo_url: "" });
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -42,7 +44,7 @@ export default function AdminSettings() {
         if (supabase) {
           const { data, error } = await supabase
             .from("venue_settings")
-            .select("id, instagram_url, facebook_url, website_url, address, phone, email, hours, google_maps_url, embed_url, show_map_embed, updated_at")
+            .select("id, instagram_url, facebook_url, website_url, address, phone, email, hours, google_maps_url, embed_url, show_map_embed, bar_name, logo_url, updated_at")
             .eq("id", DEFAULT_ID)
             .maybeSingle();
           if (error) throw error;
@@ -59,6 +61,8 @@ export default function AdminSettings() {
               google_maps_url: data.google_maps_url ?? "",
               embed_url: data.embed_url ?? "",
               show_map_embed: data.show_map_embed ?? false,
+              bar_name: data.bar_name ?? "",
+              logo_url: data.logo_url ?? "",
               updated_at: data.updated_at ?? null,
             });
           } else {
@@ -106,6 +110,8 @@ export default function AdminSettings() {
         google_maps_url: form.google_maps_url || null,
         embed_url: form.embed_url || null,
         show_map_embed: !!form.show_map_embed,
+        bar_name: form.bar_name || null,
+        logo_url: form.logo_url || null,
         updated_at: new Date().toISOString(),
       };
       if (supabase) {
@@ -210,6 +216,52 @@ export default function AdminSettings() {
                 placeholder="Mon-Fri 9am-11pm; Sat-Sun 10am-12am"
                 value={form.hours || ""}
                 onChange={(e) => setForm((f) => ({ ...f, hours: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="bar_name">Bar Name</Label>
+              <Input
+                id="bar_name"
+                placeholder="Your Bar Name"
+                value={form.bar_name || ""}
+                onChange={(e) => setForm((f) => ({ ...f, bar_name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="logo_url">Logo URL (optional if uploading below)</Label>
+              <Input
+                id="logo_url"
+                placeholder="https://yourcdn.com/logo.png"
+                value={form.logo_url || ""}
+                onChange={(e) => setForm((f) => ({ ...f, logo_url: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">You can paste a logo image URL or upload a file below. If both are provided, the uploaded file URL will be used.</p>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="logo_upload">Upload Logo</Label>
+              <Input
+                id="logo_upload"
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (!supabase) {
+                    toast({ title: "Upload unavailable", description: "Supabase is not configured.", variant: "destructive" });
+                    return;
+                  }
+                  try {
+                    const fileName = `logos/${Date.now()}_${file.name}`;
+                    const { data, error } = await supabase.storage.from("public").upload(fileName, file, { upsert: false });
+                    if (error) throw error;
+                    const { data: pub } = supabase.storage.from("public").getPublicUrl(data.path);
+                    const publicUrl = pub.publicUrl;
+                    setForm((f) => ({ ...f, logo_url: publicUrl }));
+                    toast({ title: "Logo uploaded", description: "Public URL saved to settings." });
+                  } catch (err: any) {
+                    toast({ title: "Upload failed", description: err?.message || String(err), variant: "destructive" });
+                  }
+                }}
               />
             </div>
             <div className="flex items-center gap-3 md:col-span-2">

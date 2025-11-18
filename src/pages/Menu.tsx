@@ -81,9 +81,11 @@ const Menu = () => {
   google_maps_url?: string | null;
   embed_url?: string | null;
   show_map_embed?: boolean | null;
+  bar_name?: string | null;
+  logo_url?: string | null;
   updated_at?: string | null;
   id?: string;
-}>({ id: "default", instagram_url: "", facebook_url: "", website_url: "", address: "", phone: "", email: "", hours: "", google_maps_url: "", embed_url: "", show_map_embed: false });
+}>({ id: "default", instagram_url: "", facebook_url: "", website_url: "", address: "", phone: "", email: "", hours: "", google_maps_url: "", embed_url: "", show_map_embed: false, bar_name: "", logo_url: "" });
 
   useEffect(() => {
     async function fetchMenu() {
@@ -154,6 +156,8 @@ const Menu = () => {
               google_maps_url: data.google_maps_url ?? "",
               embed_url: data.embed_url ?? "",
               show_map_embed: data.show_map_embed ?? false,
+              bar_name: data.bar_name ?? "",
+              logo_url: data.logo_url ?? "",
               updated_at: data.updated_at ?? null,
             });
           } else {
@@ -259,12 +263,15 @@ const Menu = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-4 py-8">
-        <Button variant="ghost" onClick={() => navigate("/")} className="mb-6 text-foreground hover:text-primary">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
-        </Button>
+        {/* Top Back to Home button removed as requested; one exists below */}
 
         <div className="text-center mb-6 space-y-2">
-          <h1 className="text-3xl md:text-4xl font-bold text-primary">Our Menu</h1>
+          <div className="flex items-center justify-center gap-3">
+            {settings.logo_url && (
+              <img src={settings.logo_url!} alt="Logo" className="h-12 w-12 object-contain rounded" />
+            )}
+            <h1 className="text-3xl md:text-4xl font-bold text-primary">{settings.bar_name || "Our Menu"}</h1>
+          </div>
           <p className="text-muted-foreground">Premium beverages and delicious cuisine</p>
         </div>
 
@@ -381,6 +388,7 @@ const Menu = () => {
                   )}
                 </div>
               </CardContent>
+            </Card>
           </div>
         )}
 
