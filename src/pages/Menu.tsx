@@ -1,7 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Martini, Utensils } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
@@ -23,13 +26,21 @@ function groupByCategory<T extends { category: string }>(items: T[]): CategoryBu
   return Array.from(map.entries()).map(([title, items]) => ({ title, items }));
 }
 
+function formatCurrencyINR(n: number) {
+  try {
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
+  } catch {
+    return `₹${n}`;
+  }
+}
+
 function formatAlcoholPrices(item: AlcoholItem) {
   const parts: string[] = [];
-  if (item.price_30ml != null) parts.push(`30ml ₹${item.price_30ml}`);
-  if (item.price_60ml != null) parts.push(`60ml ₹${item.price_60ml}`);
-  if (item.price_90ml != null) parts.push(`90ml ₹${item.price_90ml}`);
-  if (item.price_180ml != null) parts.push(`180ml ₹${item.price_180ml}`);
-  if (item.price_bottle != null) parts.push(`Bottle ₹${item.price_bottle}`);
+  if (item.price_30ml != null) parts.push(`30ml ${formatCurrencyINR(item.price_30ml)}`);
+  if (item.price_60ml != null) parts.push(`60ml ${formatCurrencyINR(item.price_60ml)}`);
+  if (item.price_90ml != null) parts.push(`90ml ${formatCurrencyINR(item.price_90ml)}`);
+  if (item.price_180ml != null) parts.push(`180ml ${formatCurrencyINR(item.price_180ml)}`);
+  if (item.price_bottle != null) parts.push(`Bottle ${formatCurrencyINR(item.price_bottle)}`);
   return parts.join(" • ");
 }
 
@@ -38,6 +49,7 @@ const Menu = () => {
   const { toast } = useToast();
   const [view, setView] = useState<"drinks" | "food">("drinks");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [alcohol, setAlcohol] = useState<AlcoholItem[]>([]);
   const [food, setFood] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +87,17 @@ const Menu = () => {
     [categoriesBuckets, selectedCategory],
   );
 
+  const filteredBuckets = useMemo(() => {
+    if (!searchQuery.trim()) return visibleBuckets;
+    const q = searchQuery.toLowerCase();
+    return visibleBuckets
+      .map((bucket) => ({
+        title: bucket.title,
+        items: bucket.items.filter((it) => (it as any).name?.toLowerCase().includes(q)),
+      }))
+      .filter((b) => b.items.length > 0);
+  }, [visibleBuckets, searchQuery]);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-4 py-8">
@@ -87,67 +110,102 @@ const Menu = () => {
           <p className="text-muted-foreground">Premium beverages and delicious cuisine</p>
         </div>
 
-        {/* Segmented control */}
-        <div className="flex w-full max-w-md mx-auto rounded-full border border-border overflow-hidden">
-          <Button
-            variant={view === "drinks" ? "default" : "ghost"}
-            className={`flex-1 rounded-none ${view === "drinks" ? "bg-primary text-primary-foreground" : ""}`}
-            onClick={() => {
-              setView("drinks");
-              setSelectedCategory(null);
-            }}
-          >
-            🍸 Drinks
-          </Button>
-          <Button
-            variant={view === "food" ? "default" : "ghost"}
-            className={`flex-1 rounded-none ${view === "food" ? "bg-primary text-primary-foreground" : ""}`}
-            onClick={() => {
-              setView("food");
-              setSelectedCategory(null);
-            }}
-          >
-            🍽️ Food
-          </Button>
-        </div>
-
-        {/* Category chips */}
-        <div className="mt-4 flex gap-2 overflow-x-auto no-scrollbar py-1">
-          {chips.map((chip) => (
+        {/* Sticky filter/search bar */}
+        <div className="sticky top-0 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3 -mx-4 px-4 border-b">
+          <div className="flex w-full max-w-2xl mx-auto rounded-full border border-border overflow-hidden">
             <Button
-              key={chip}
-              variant={selectedCategory === chip ? "secondary" : "outline"}
-              size="sm"
-              className="shrink-0"
-              onClick={() => setSelectedCategory(selectedCategory === chip ? null : chip)}
+              variant={view === "drinks" ? "default" : "ghost"}
+              className={`flex-1 rounded-none ${view === "drinks" ? "bg-primary text-primary-foreground" : ""}`}
+              onClick={() => {
+                setView("drinks");
+                setSelectedCategory(null);
+              }}
             >
-              {chip}
+              <Martini className="mr-2 h-4 w-4" /> Drinks
             </Button>
-          ))}
+            <Button
+              variant={view === "food" ? "default" : "ghost"}
+              className={`flex-1 rounded-none ${view === "food" ? "bg-primary text-primary-foreground" : ""}`}
+              onClick={() => {
+                setView("food");
+                setSelectedCategory(null);
+              }}
+            >
+              <Utensils className="mr-2 h-4 w-4" /> Food
+            </Button>
+          </div>
+
+          <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar py-1">
+            {chips.map((chip) => (
+              <Button
+                key={chip}
+                variant={selectedCategory === chip ? "secondary" : "outline"}
+                size="sm"
+                className="shrink-0"
+                onClick={() => setSelectedCategory(selectedCategory === chip ? null : chip)}
+              >
+                {chip}
+              </Button>
+            ))}
+          </div>
+
+          <div className="mt-3 max-w-2xl mx-auto">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search items (e.g., Mojito, Paneer, Whiskey)"
+            />
+          </div>
         </div>
 
         {/* Cards */}
         {loading ? (
-          <div className="mt-10 text-center text-muted-foreground">Loading menu…</div>
-        ) : visibleBuckets.length === 0 ? (
-          <div className="mt-10 text-center text-muted-foreground">No items found.</div>
+          <div className="mt-6 grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="rounded-xl border bg-card/70 backdrop-blur-sm shadow-sm">
+                <CardHeader>
+                  <Skeleton className="h-6 w-40" />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {[...Array(4)].map((__, j) => (
+                    <div key={j} className="flex justify-between items-center">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : filteredBuckets.length === 0 ? (
+          <div className="mt-10 text-center text-muted-foreground">No items found. Try clearing filters or search.</div>
         ) : (
           <div className="mt-6 grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {visibleBuckets.map((bucket) => (
-              <Card key={bucket.title} className="bg-card border-border">
+            {filteredBuckets.map((bucket) => (
+              <Card key={bucket.title} className="group rounded-xl border bg-card/70 backdrop-blur-sm shadow-sm hover:shadow-md transition">
                 <CardHeader>
-                  <CardTitle className="text-primary">{bucket.title}</CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-primary">
+                    {view === "drinks" ? <Martini className="h-5 w-5" /> : <Utensils className="h-5 w-5" />}
+                    {bucket.title}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {bucket.items.map((item) => (
                       <div key={(item as any).id} className="space-y-1">
                         <div className="flex justify-between items-center">
-                          <span>{(item as any).name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{(item as any).name}</span>
+                            {"vegetarian" in item && (
+                              <Badge className={(item as FoodItem).vegetarian ? "bg-green-600 text-white" : "bg-amber-600 text-white"}>
+                                {(item as FoodItem).vegetarian ? "Veg" : "Non-Veg"}
+                              </Badge>
+                            )}
+                          </div>
                           {"price" in item ? (
-                            <span className="text-primary font-semibold">₹{(item as FoodItem).price}</span>
+                            <span className="text-primary font-semibold">{formatCurrencyINR((item as FoodItem).price)}</span>
                           ) : (
-                            <span className="text-primary font-semibold">{formatAlcoholPrices(item as AlcoholItem)}</span>
+                            <span className="text-primary font-semibold text-sm">{formatAlcoholPrices(item as AlcoholItem)}</span>
                           )}
                         </div>
                         {"description" in item && (item as FoodItem).description && (
